@@ -5,6 +5,8 @@ import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { Toaster } from "react-hot-toast";
 import { getUser } from "@/lib/auth";
+import { VisitorTracker } from "@/components/VisitorTracker";
+
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -48,6 +50,7 @@ export default async function RootLayout({
           </footer>
         </RanchProvider>
         <Toaster />
+        <VisitorTracker />
       </body>
     </html>
   );

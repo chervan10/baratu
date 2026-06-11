@@ -8,8 +8,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
 }
 
 model User {
@@ -32,4 +31,14 @@ model SavedItem {
   cidade    String
   valor     Float
   categoria String
+}
+
+model Visitor {
+  id          String   @id @default(cuid())
+  mobile      String
+  location    String
+  browser     String
+  sessionTime Int      @default(0)
+  phoneSpec   String
+  createdAt   DateTime @default(now())
 }
