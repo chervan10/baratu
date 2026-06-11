@@ -42,3 +42,29 @@ model Visitor {
   phoneSpec   String
   createdAt   DateTime @default(now())
 }
+
+model ContactSubmission {
+  id            String   @id @default(uuid())
+  fullName      String   @map("full_name")
+  email         String
+  phone         String?
+  subject       String
+  message       String
+  verifiedEmail Boolean  @default(false) @map("verified_email")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("contact_submissions")
+}
+
+model EmailOtp {
+  id        String   @id @default(uuid())
+  email     String
+  otpCode   String   @map("otp_code")
+  attempts  Int      @default(0)
+  expiresAt DateTime @map("expires_at")
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("email_otps")
+}
+
