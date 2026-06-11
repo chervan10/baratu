@@ -1,9 +1,10 @@
 "use client";
 import { products } from "@/data/produtos";
 import { useRanch } from "@/context/RanchContext";
+import { useCart } from "@/context/CartContext";
 import Image from "next/image";
 import Link from "next/link";
-import { MapPin, ArrowLeft, Plus, Check, ShoppingBasket, LayoutGrid } from "lucide-react";
+import { MapPin, ArrowLeft, Plus, Check, ShoppingBasket, LayoutGrid, ShoppingBag } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -11,6 +12,7 @@ export default function ProductDetailPage() {
   const params = useParams();
   const id = parseInt(params.id as string);
   const { cart, addToRoute, removeFromRoute } = useRanch();
+  const { addToCart } = useCart();
   const [sugestoes, setSugestoes] = useState<typeof products>([]);
 
   const product = products.find(p => p.id === id);
@@ -75,13 +77,21 @@ export default function ProductDetailPage() {
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-3">
                     <div className="text-right">
                       <p className={`text-2xl font-black ${isDestaque ? 'text-green-800' : 'text-gray-900'}`}>
                         {p.valor} MT
                       </p>
                       {isDestaque && <span className="text-[10px] font-bold text-green-800 uppercase">Melhor Preço</span>}
                     </div>
+
+                    <button 
+                      onClick={() => addToCart(product, 1, p)}
+                      className="w-12 h-12 rounded-full flex justify-center items-center transition-all bg-green-800 hover:bg-green-700 text-white hover:shadow-md cursor-pointer"
+                      title="Adicionar ao carrinho de compras"
+                    >
+                      <ShoppingBag size={20} />
+                    </button>
 
                     <button 
                       onClick={() => {

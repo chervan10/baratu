@@ -106,4 +106,41 @@ model AdminLockout {
   @@map("admin_lockouts")
 }
 
+model Order {
+  id            String      @id @default(uuid())
+  orderNumber   String      @unique @map("order_number")
+  customerName  String      @map("customer_name")
+  customerEmail String      @map("customer_email")
+  customerPhone String      @map("customer_phone")
+  country       String
+  provinceState String?     @map("province_state")
+  city          String
+  address       String
+  postalCode    String      @map("postal_code")
+  orderNotes    String?     @map("order_notes")
+  subtotal      Float
+  shippingCost  Float       @map("shipping_cost")
+  tax           Float       @default(0)
+  discount      Float       @default(0)
+  totalAmount   Float       @map("total_amount")
+  orderStatus   String      @default("Pending") @map("order_status") // Pending, Confirmed, Processing, Shipped, Delivered, Cancelled
+  createdAt     DateTime    @default(now()) @map("created_at")
+  items         OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String @id @default(uuid())
+  orderId     String @map("order_id")
+  order       Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   Int    @map("product_id")
+  productName String @map("product_name")
+  quantity    Int
+  unitPrice   Float  @map("unit_price")
+  totalPrice  Float  @map("total_price")
+
+  @@map("order_items")
+}
+
 

@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ShoppingBasket, Navigation, Menu, X, UserCircle } from "lucide-react";
+import { ShoppingBasket, Navigation, Menu, X, UserCircle, ShoppingBag } from "lucide-react";
 import { CartBadge } from "@/app/CartBadge";
+import { CartBadge as EcomCartBadge } from "@/components/CartBadge";
 
 interface NavbarProps {
   user: { id: string; email: string; name: string | null } | null;
@@ -39,11 +40,19 @@ export function Navbar({ user }: NavbarProps) {
           <Link href="/produtos" className="hover:text-yellow-300 transition">Produtos</Link>
           <Link href="/sobre" className="hover:text-yellow-300 transition">Sobre Nós</Link>
           <Link href="/contacto" className="hover:text-yellow-300 transition">Contacto</Link>
+          
           <Link href="/rota" className="bg-yellow-400 hover:bg-yellow-500 text-green-900 px-4 py-2 rounded-full flex items-center gap-2 transition ml-4">
             <Navigation size={16} /> 
             Minha Rota
             <CartBadge />
           </Link>
+
+          <Link href="/cart" className="bg-green-700 hover:bg-green-650 text-white px-4 py-2 rounded-full flex items-center gap-2 transition border border-green-600">
+            <ShoppingBag size={16} />
+            Carrinho
+            <EcomCartBadge />
+          </Link>
+
           <Link href="/perfil" className="hover:text-yellow-300 transition flex items-center gap-1">
             <UserCircle size={20} />
             {firstName ? firstName : "Perfil"}
@@ -52,13 +61,23 @@ export function Navbar({ user }: NavbarProps) {
 
         <div className="md:hidden flex items-center gap-4 z-50">
           <Link href="/rota" className="flex items-center relative" onClick={() => setIsOpen(false)}>
-            <div className="bg-yellow-400 hover:bg-yellow-500 text-green-900 p-2 rounded-full transition">
+            <div className="bg-yellow-400 hover:bg-yellow-500 text-green-900 p-2 rounded-full transition animate-in zoom-in duration-200">
               <Navigation size={20} />
             </div>
             <div className="absolute -top-1 -right-2">
               <CartBadge />
             </div>
           </Link>
+
+          <Link href="/cart" className="flex items-center relative" onClick={() => setIsOpen(false)}>
+            <div className="bg-green-700 text-white p-2 rounded-full transition border border-green-600">
+              <ShoppingBag size={20} />
+            </div>
+            <div className="absolute -top-1 -right-2">
+              <EcomCartBadge />
+            </div>
+          </Link>
+
           <Link href="/perfil" className="flex items-center text-white hover:text-yellow-300 transition" onClick={() => setIsOpen(false)}>
             <UserCircle size={24} />
           </Link>
@@ -88,6 +107,10 @@ export function Navbar({ user }: NavbarProps) {
             <Link href="/rota" className="p-4 bg-yellow-400 text-green-900 rounded-2xl mt-2 flex items-center justify-center gap-2" onClick={() => setIsOpen(false)}>
               <Navigation size={20} /> 
               Ver Minha Rota
+            </Link>
+            <Link href="/cart" className="p-4 bg-green-950 text-white rounded-2xl mt-2 flex items-center justify-center gap-2" onClick={() => setIsOpen(false)}>
+              <ShoppingBag size={20} /> 
+              Ver Carrinho
             </Link>
           </nav>
         </div>

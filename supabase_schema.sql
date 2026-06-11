@@ -82,3 +82,64 @@ CREATE POLICY "Allow public update tracking" ON visitor_analytics
 CREATE POLICY "Allow authenticated read analytics" ON visitor_analytics
     FOR SELECT TO authenticated USING (true);
 
+-- Create table for orders
+CREATE TABLE orders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_number TEXT UNIQUE NOT NULL,
+    customer_name TEXT NOT NULL,
+    customer_email TEXT NOT NULL,
+    customer_phone TEXT NOT NULL,
+    country TEXT NOT NULL,
+    province_state TEXT,
+    city TEXT NOT NULL,
+    address TEXT NOT NULL,
+    postal_code TEXT NOT NULL,
+    order_notes TEXT,
+    subtotal NUMERIC NOT NULL,
+    shipping_cost NUMERIC NOT NULL,
+    tax NUMERIC DEFAULT 0 NOT NULL,
+    discount NUMERIC DEFAULT 0 NOT NULL,
+    total_amount NUMERIC NOT NULL,
+    order_status TEXT DEFAULT 'Pending' NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Create table for order items
+CREATE TABLE order_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    product_id INTEGER NOT NULL,
+    product_name TEXT NOT NULL,
+    quantity INTEGER NOT NULL,
+    unit_price NUMERIC NOT NULL,
+    total_price NUMERIC NOT NULL
+);
+
+-- Indexes for performance
+CREATE INDEX idx_orders_order_number ON orders(order_number);
+CREATE INDEX idx_orders_customer_email ON orders(customer_email);
+CREATE INDEX idx_orders_created_at ON orders(created_at);
+CREATE INDEX idx_order_items_order_id ON order_items(order_id);
+
+-- Enable RLS (Row Level Security)
+ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
+
+-- Order insertion policies (Public/Anon users can checkout)
+CREATE POLICY "Allow public insert orders" ON orders
+    FOR INSERT TO anon, authenticated WITH CHECK (true);
+
+CREATE POLICY "Allow public insert order_items" ON order_items
+    FOR INSERT TO anon, authenticated WITH CHECK (true);
+
+-- Admin read/write policies
+CREATE POLICY "Allow authenticated read orders" ON orders
+    FOR SELECT TO authenticated USING (true);
+
+CREATE POLICY "Allow authenticated update orders" ON orders
+    FOR UPDATE TO authenticated USING (true);
+
+CREATE POLICY "Allow authenticated read order_items" ON order_items
+    FOR SELECT TO authenticated USING (true);
+
+

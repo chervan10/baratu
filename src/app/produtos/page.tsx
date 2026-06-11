@@ -2,11 +2,12 @@
 import { useState, Suspense } from 'react';
 import { products } from '@/data/produtos';
 import Image from 'next/image';
-import { Search, MapPin, Plus } from 'lucide-react';
+import { Search, MapPin, Plus, ShoppingBag } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useContext } from 'react';
 import { useRanch } from '@/context/RanchContext';
+import { useCart } from '@/context/CartContext';
 import toast from 'react-hot-toast';
 
 function ProdutosContent() {
@@ -16,6 +17,7 @@ function ProdutosContent() {
   const [search, setSearch] = useState(initialSearch);
   const [selectedCategory, setSelectedCategory] = useState("Todos");
   const { addToRoute } = useRanch();
+  const { addToCart } = useCart();
 
   const categories = ["Todos", ...Array.from(new Set(products.map(p => p.categoria)))];
 
@@ -37,7 +39,7 @@ function ProdutosContent() {
       categoria: product.categoria
     };
     addToRoute(cartItem);
-    toast.success(`O produto ${product.nome} foi adicionado ao carrinho!`);
+    toast.success(`O produto "${product.nome}" foi adicionado à tua Rota!`);
   };
 
   return (
@@ -97,7 +99,7 @@ function ProdutosContent() {
                     {item.precos.map((p, i) => {
                       const isDestaque = p.valor === menorPreco;
                       return (
-                        <div key={i} className={`flex justify-between items-center p-3 rounded-xl border ${isDestaque ? 'border-green-800 bg-green-50/50' : 'border-gray-100 bg-gray-50'}`}>
+                        <div key={i} className={`flex justify-between items-center p-3 rounded-xl border ${isDestaque ? 'border-green-800 bg-green-50/50' : 'border-gray-100 bg-gray-50'} gap-4`}>
                           <div>
                             <p className="text-[11px] font-bold text-gray-600 uppercase">{p.mercado}</p>
                             <div className="flex items-center text-gray-500">
@@ -105,11 +107,24 @@ function ProdutosContent() {
                               <span className="text-[10px] uppercase">{p.cidade}</span>
                             </div>
                           </div>
-                          <div className="text-right flex flex-col items-end">
-                            <p className={`text-lg font-black ${isDestaque ? 'text-green-800' : 'text-gray-700'}`}>
-                              {p.valor} MT
-                            </p>
-                            {isDestaque && <span className="text-[9px] font-bold text-green-800 uppercase bg-white px-2 py-0.5 rounded-full border border-green-100 inline-block">Melhor Preço</span>}
+                          <div className="flex items-center gap-3">
+                            <div className="text-right flex flex-col items-end">
+                              <p className={`text-lg font-black ${isDestaque ? 'text-green-800' : 'text-gray-700'}`}>
+                                {p.valor} MT
+                              </p>
+                              {isDestaque && <span className="text-[9px] font-bold text-green-800 uppercase bg-white px-2 py-0.5 rounded-full border border-green-100 inline-block">Melhor Preço</span>}
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                addToCart(item, 1, p);
+                              }}
+                              className="bg-green-800 hover:bg-green-700 text-white p-2 rounded-xl transition-colors cursor-pointer flex items-center justify-center shadow-sm"
+                              title="Adicionar ao carrinho de compras"
+                            >
+                              <ShoppingBag size={14} />
+                            </button>
                           </div>
                         </div>
                       );
@@ -123,8 +138,8 @@ function ProdutosContent() {
                   e.stopPropagation();
                   handleAddToCart(item);
                 }}
-                className="absolute top-4 right-4 bg-green-800 text-white p-2 rounded-full hover:bg-green-700 transition-colors shadow-md"
-                title="Adicionar ao carrinho"
+                className="absolute top-4 right-4 bg-green-800 text-white p-2 rounded-full hover:bg-green-700 transition-colors shadow-md cursor-pointer"
+                title="Adicionar à Minha Rota"
               >
                 <Plus size={20} />
               </button>
