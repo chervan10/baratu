@@ -247,19 +247,7 @@ export default function ContactoPage() {
               <p className="text-lg font-bold text-gray-800">Maputo, Moçambique</p>
             </div>
 
-            <div className="bg-gradient-to-br from-green-800 to-green-950 text-white rounded-3xl p-8 shadow-sm border border-green-900 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-green-700 rounded-full blur-2xl opacity-40 -z-10" />
-              <h3 className="text-lg font-bold mb-2">Painel Admin</h3>
-              <p className="text-green-200 text-sm mb-6 leading-relaxed">
-                É administrador do Baratu? Aceda ao painel para ver todas as submissões recebidas.
-              </p>
-              <Link 
-                href="/admin/submissions" 
-                className="inline-flex items-center justify-center px-5 py-2.5 bg-white text-green-900 font-extrabold text-sm rounded-full shadow-sm hover:bg-green-50 transition-all active:scale-95"
-              >
-                Aceder ao Painel
-              </Link>
-            </div>
+
 
           </div>
 

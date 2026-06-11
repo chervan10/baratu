@@ -68,3 +68,42 @@ model EmailOtp {
   @@map("email_otps")
 }
 
+model VisitorAnalytics {
+  id              String    @id @default(uuid())
+  visitorId       String    @map("visitor_id")
+  deviceName      String    @map("device_name")
+  deviceType      String    @map("device_type")
+  browser         String
+  browserVersion  String    @map("browser_version")
+  operatingSystem String    @map("operating_system")
+  osVersion       String    @map("os_version")
+  screenWidth     Int       @map("screen_width")
+  screenHeight    Int       @map("screen_height")
+  pixelRatio      Float     @map("pixel_ratio")
+  language        String
+  timezone        String
+  country         String
+  city            String
+  region          String
+  latitude        Float?
+  longitude       Float?
+  sessionStart    DateTime  @map("session_start")
+  sessionEnd      DateTime? @map("session_end")
+  sessionDuration Int       @map("session_duration")
+  visitDate       DateTime  @map("visit_date")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@map("visitor_analytics")
+}
+
+model AdminLockout {
+  id             String    @id @default(uuid())
+  ipAddress      String    @unique @map("ip_address")
+  failedAttempts Int       @default(0) @map("failed_attempts")
+  lockedUntil    DateTime? @map("locked_until")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@map("admin_lockouts")
+}
+
+

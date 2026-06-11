@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
-export default function VisitorsPageRedirect() {
+export default function AnalyticsPageRedirect() {
   redirect("/admin");
 }

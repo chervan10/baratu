@@ -1,6 +1,26 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { UAParser } from "ua-parser-js";
+
+// Helper to generate a browser fingerprint synchronously
+const generateFingerprint = (): string => {
+  if (typeof window === "undefined") return "ssr";
+  
+  const screenSpec = `${window.screen.width}x${window.screen.height}x${window.screen.colorDepth}`;
+  const language = navigator.language || "";
+  const timezone = new Date().getTimezoneOffset().toString();
+  const userAgent = navigator.userAgent || "";
+  
+  const rawData = `${screenSpec}|${language}|${timezone}|${userAgent}`;
+  
+  // Quick djb2 hash function for strings
+  let hash = 5381;
+  for (let i = 0; i < rawData.length; i++) {
+    hash = (hash * 33) ^ rawData.charCodeAt(i);
+  }
+  return (hash >>> 0).toString(16);
+};
 
 export function VisitorTracker() {
   const visitorIdRef = useRef<string | null>(null);
@@ -8,168 +28,133 @@ export function VisitorTracker() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Only run on client-side
     if (typeof window === "undefined") return;
 
-    const detectBrowser = () => {
-      const ua = navigator.userAgent;
-      let tem;
-      let M = ua.match(/(opera|chrome|safari|firefox|msie|trident(?=\/))\/?\s*(\d+)/i) || [];
+    // 1. Initialize Unique IDs (Local Storage & Session Storage)
+    let localStorageId = localStorage.getItem("baratu_visitor_id");
+    if (!localStorageId) {
+      localStorageId = crypto.randomUUID 
+        ? crypto.randomUUID() 
+        : Math.random().toString(36).substring(2) + Date.now().toString(36);
+      localStorage.setItem("baratu_visitor_id", localStorageId);
+    }
+
+    let sessionStorageId = sessionStorage.getItem("baratu_session_id");
+    if (!sessionStorageId) {
+      sessionStorageId = crypto.randomUUID 
+        ? crypto.randomUUID() 
+        : Math.random().toString(36).substring(2) + Date.now().toString(36);
+      sessionStorage.setItem("baratu_session_id", sessionStorageId);
+    }
+
+    // Fingerprint combined with local storage ID is our unique visitorId
+    const fingerprint = generateFingerprint();
+    const uniqueVisitorId = `${fingerprint}-${localStorageId.substring(0, 8)}`;
+    visitorIdRef.current = uniqueVisitorId;
+
+    // 2. Parse User Agent for system info
+    const parser = new UAParser();
+    const uaResult = parser.getResult();
+
+    const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
+    const parsedDeviceType = uaResult.device.type 
+      ? uaResult.device.type.charAt(0).toUpperCase() + uaResult.device.type.slice(1) 
+      : (isMobileDevice ? "Mobile" : "Desktop");
       
-      if (/trident/i.test(M[1])) {
-        tem = /\brv[ :]+(\d+)/g.exec(ua) || [];
-        return "IE " + (tem[1] || "");
-      }
-      if (M[1] === "Chrome") {
-        tem = ua.match(/\b(OPR|Edge)\/(\d+)/);
-        if (tem != null) return tem.slice(1).join(" ").replace("OPR", "Opera");
-      }
-      M = M[2] ? [M[1], M[2]] : [navigator.appName, navigator.appVersion, "-?"];
-      if ((tem = ua.match(/version\/(\d+)/i)) != null) M.splice(1, 1, tem[1]);
-      return M.join(" ");
+    const parsedDeviceName = uaResult.device.model 
+      ? `${uaResult.device.vendor || ""} ${uaResult.device.model}`.trim()
+      : (isMobileDevice ? "Smartphone" : "Computador");
+
+    const trackingPayload = {
+      visitorId: uniqueVisitorId,
+      deviceName: parsedDeviceName,
+      deviceType: parsedDeviceType,
+      browser: uaResult.browser.name || "Desconhecido",
+      browserVersion: uaResult.browser.version || "Desconhecido",
+      operatingSystem: uaResult.os.name || "Desconhecido",
+      osVersion: uaResult.os.version || "Desconhecido",
+      screenWidth: window.screen.width || 0,
+      screenHeight: window.screen.height || 0,
+      pixelRatio: window.devicePixelRatio || 1,
+      language: navigator.language || "pt",
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Africa/Maputo",
+      latitude: null as number | null,
+      longitude: null as number | null,
+      sessionDuration: 0
     };
 
-    const getOS = () => {
-      const userAgent = window.navigator.userAgent;
-      const platform = (window.navigator as any).userAgentData?.platform || window.navigator.platform || "";
-      const macosPlatforms = ["Macintosh", "MacIntel", "MacPPC", "Mac68K"];
-      const windowsPlatforms = ["Win32", "Win64", "Windows", "wintarget"];
-      const iosPlatforms = ["iPhone", "iPad", "iPod"];
-
-      let os = "Unknown OS";
-      if (macosPlatforms.indexOf(platform) !== -1) {
-        os = "macOS";
-      } else if (iosPlatforms.indexOf(platform) !== -1) {
-        os = "iOS";
-      } else if (windowsPlatforms.indexOf(platform) !== -1) {
-        os = "Windows";
-      } else if (/Android/.test(userAgent)) {
-        os = "Android";
-      } else if (/Linux/.test(platform)) {
-        os = "Linux";
-      } else if (/iPhone|iPad|iPod/.test(userAgent)) {
-        os = "iOS";
-      }
-      return os;
-    };
-
-    const initTracker = async () => {
-      // 1. Detect device type
-      const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
-      const mobileStatus = isMobileDevice ? "Mobile" : "Desktop";
-
-      // 2. Detect browser and OS specs
-      const browser = detectBrowser();
-      const os = getOS();
-      const screenSpec = `${window.screen.width}x${window.screen.height}`;
-      const pixelRatio = window.devicePixelRatio ? `@${window.devicePixelRatio}x` : "";
-      const memory = (navigator as any).deviceMemory ? ` | ${ (navigator as any).deviceMemory }GB RAM` : "";
-      const cores = navigator.hardwareConcurrency ? ` | ${navigator.hardwareConcurrency} Cores` : "";
-      
-      const phoneSpec = `${os} (${screenSpec}${pixelRatio})${memory}${cores}`;
-
-      // 3. Fetch Location via IP Geolocation API
-      let locationText = "Unknown Location";
+    // Helper to post tracking details to server
+    const sendTrackingData = async (payload: typeof trackingPayload) => {
       try {
-        const res = await fetch("https://ipapi.co/json/");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.city && data.country_name) {
-            locationText = `${data.city}, ${data.country_name}`;
-          } else if (data.country_name) {
-            locationText = data.country_name;
-          }
-        }
-      } catch (err) {
-        // Fallback to secondary location provider
-        try {
-          const res = await fetch("https://geolocation-db.com/json/");
-          if (res.ok) {
-            const data = await res.json();
-            if (data.city && data.country_name) {
-              locationText = `${data.city}, ${data.country_name}`;
-            } else if (data.country_name) {
-              locationText = data.country_name;
-            }
-          }
-        } catch (subErr) {
-          console.warn("Failed to fetch location:", subErr);
-        }
-      }
-
-      // 4. Create visitor record on the server
-      try {
-        const res = await fetch("/api/visitors", {
+        await fetch("/api/analytics/track", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            mobile: mobileStatus,
-            location: locationText,
-            browser,
-            sessionTime: 0,
-            phoneSpec,
-          }),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          keepalive: true
         });
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data.visitorId) {
-            visitorIdRef.current = data.visitorId;
-          }
-        }
       } catch (err) {
-        console.error("Failed to register visitor session:", err);
+        console.warn("Analytics tracking request failed:", err);
       }
     };
 
-    // Initialize the tracker
-    initTracker();
+    // 3. Obtain Geolocation (HTML5 API check with 3s timeout)
+    const initTrackingWithGeo = () => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const updatedPayload = {
+              ...trackingPayload,
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude
+            };
+            sendTrackingData(updatedPayload);
+          },
+          () => {
+            // Permission denied or error - fallback to server IP-based geo
+            sendTrackingData(trackingPayload);
+          },
+          { timeout: 3000 }
+        );
+      } else {
+        sendTrackingData(trackingPayload);
+      }
+    };
 
-    // 5. Setup periodic heartbeat interval (every 10s)
-    intervalRef.current = setInterval(async () => {
-      if (!visitorIdRef.current) return;
+    initTrackingWithGeo();
+
+    // 4. Setup heartbeat interval (every 15 seconds) to update session duration
+    intervalRef.current = setInterval(() => {
       const elapsedSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
+      
+      const heartbeatPayload = {
+        visitorId: uniqueVisitorId,
+        sessionDuration: elapsedSeconds
+      };
 
-      try {
-        await fetch("/api/visitors", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            id: visitorIdRef.current,
-            sessionTime: elapsedSeconds,
-          }),
-          keepalive: true, // Keep connection open during navigation
-        });
-      } catch (err) {
-        console.warn("Heartbeat failed:", err);
-      }
-    }, 10000);
+      fetch("/api/analytics/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(heartbeatPayload),
+        keepalive: true
+      }).catch((err) => console.warn("Session heartbeat failed:", err));
+    }, 15000);
 
-    // 6. Send final session updates on page unload
+    // 5. Setup final unload listener
     const handleUnload = () => {
-      if (!visitorIdRef.current) return;
       const elapsedSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
-
-      const payload = JSON.stringify({
-        id: visitorIdRef.current,
-        sessionTime: elapsedSeconds,
+      const unloadPayload = JSON.stringify({
+        visitorId: uniqueVisitorId,
+        sessionDuration: elapsedSeconds
       });
 
-      // Use beacon API if supported, fallback to fetch keepalive
       if (navigator.sendBeacon) {
-        navigator.sendBeacon("/api/visitors", payload);
+        navigator.sendBeacon("/api/analytics/track", unloadPayload);
       } else {
-        fetch("/api/visitors", {
+        fetch("/api/analytics/track", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: payload,
-          keepalive: true,
+          headers: { "Content-Type": "application/json" },
+          body: unloadPayload,
+          keepalive: true
         });
       }
     };
@@ -184,5 +169,5 @@ export function VisitorTracker() {
     };
   }, []);
 
-  return null; // This is a behavior-only tracker component
+  return null; // behaviour-only tracker component
 }

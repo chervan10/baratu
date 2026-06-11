@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { RanchProvider } from "@/context/RanchContext";
 import "./globals.css";
@@ -21,8 +21,12 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Baratu | Preços de Maputo",
   description: "Encontra os Melhores Preços do Dia em Maputo",
-  viewport: "width=device-width, initial-scale=1",
   manifest: "/manifest.json",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default async function RootLayout({
