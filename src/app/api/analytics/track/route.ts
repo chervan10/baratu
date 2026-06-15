@@ -65,9 +65,15 @@ export async function POST(req: NextRequest) {
 
     const durationSec = typeof sessionDuration === 'number' ? sessionDuration : 0;
 
-    // 1. Check if this unique visitor already exists in DB
+    // 1. Check if this unique visitor already exists in DB (using visitorId or fingerprint prefix)
+    const fingerprint = visitorId.split("-")[0];
     const existingVisitor = await prisma.visitorAnalytics.findFirst({
-      where: { visitorId }
+      where: {
+        OR: [
+          { visitorId },
+          { visitorId: { startsWith: fingerprint + "-" } }
+        ]
+      }
     });
 
     if (existingVisitor) {
@@ -84,16 +90,20 @@ export async function POST(req: NextRequest) {
       // Try updating via Supabase JS client if env variables are configured
       const isSupabaseConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
       if (isSupabaseConfigured) {
-        await supabase
-          .from("visitor_analytics")
-          .update({
-            session_end: now.toISOString(),
-            session_duration: Math.max(existingVisitor.sessionDuration, durationSec)
-          })
-          .eq("visitor_id", visitorId);
+        try {
+          await supabase
+            .from("visitor_analytics")
+            .update({
+              session_end: now.toISOString(),
+              session_duration: Math.max(existingVisitor.sessionDuration, durationSec)
+            })
+            .eq("visitor_id", existingVisitor.visitorId);
+        } catch (err) {
+          console.error("Supabase update error:", err);
+        }
       }
 
-      return NextResponse.json({ success: true, isNew: false });
+      return NextResponse.json({ success: true, isNew: false, visitorId: existingVisitor.visitorId });
     }
 
     // 2. Count existing unique visitors to enforce the 10 limit rule

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
-import { sendOrderEmails } from "@/lib/email";
+import { initiateMpesaPayment } from "@/lib/mpesa";
 
 // Validation Schema for Checkout Form
 const checkoutSchema = z.object({
@@ -78,6 +78,12 @@ export async function POST(request: NextRequest) {
 
     // 3. E-commerce Pricing calculations (Strict server-side validation/recalculation)
     const subtotal = cartItems.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0);
+    if (subtotal <= 0) {
+      return NextResponse.json(
+        { error: "O valor total da compra deve ser superior a zero." },
+        { status: 400 }
+      );
+    }
     const shippingCost = subtotal > 0 ? 150 : 0;
     const tax = subtotal * 0.17; // 17% IVA
 
@@ -88,9 +94,18 @@ export async function POST(request: NextRequest) {
     }
     const totalAmount = Math.max(0, subtotal + shippingCost + tax - discount);
 
+    // 4. M-Pesa Payment Request pre-validation
+    const cleanPhone = customerPhone.replace(/[\s+-]/g, "");
+    if (!/^(258)?(84|85|82|83|86|87)\d{7}$/.test(cleanPhone)) {
+      return NextResponse.json(
+        { error: "Formato de telefone M-Pesa inválido. Use um número de Moçambique válido (ex: 841234567)." },
+        { status: 400 }
+      );
+    }
+
     const orderNumber = generateOrderNumber();
 
-    // 4. Prisma Transaction to save order & items
+    // 5. Prisma Transaction to save order & items
     const order = await prisma.$transaction(async (tx) => {
       // Create order
       const newOrder = await tx.order.create({
@@ -110,6 +125,8 @@ export async function POST(request: NextRequest) {
           tax,
           discount,
           totalAmount,
+          paymentMethod: "M-Pesa",
+          paymentStatus: "Pending",
           orderStatus: "Pending",
         },
       });
@@ -129,23 +146,46 @@ export async function POST(request: NextRequest) {
       return newOrder;
     });
 
-    // 5. Send Email Notifications (async, using promise/background fetch)
-    const emailItems = cartItems.map(item => ({
-      productName: item.productName,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      totalPrice: item.unitPrice * item.quantity,
-      mercado: item.mercado
-    }));
+    // 6. Initiate M-Pesa Payment Flow
+    const mpesaResult = await initiateMpesaPayment(order.id, totalAmount, customerPhone);
 
-    // Dispatch emails (logs errors internally and falls back to console if not configured)
-    await sendOrderEmails(order, emailItems);
+    if (!mpesaResult.success) {
+      // Clean up the order in case payment initiation strictly fails on core API validation
+      await prisma.order.update({
+        where: { id: order.id },
+        data: {
+          paymentStatus: "Failed",
+          orderStatus: "Cancelled",
+        },
+      });
+
+      return NextResponse.json(
+        { error: mpesaResult.responseDescription || "Falha ao iniciar pagamento M-Pesa." },
+        { status: 400 }
+      );
+    }
+
+    // 7. Save Payment record
+    await prisma.payment.create({
+      data: {
+        orderId: order.id,
+        checkoutRequestId: mpesaResult.checkoutRequestId,
+        transactionId: mpesaResult.transactionId || null,
+        mpesaReference: mpesaResult.mpesaReference || null,
+        amount: totalAmount,
+        phoneNumber: customerPhone,
+        paymentStatus: "Pending",
+        responseCode: mpesaResult.responseCode,
+        responseDescription: mpesaResult.responseDescription,
+      },
+    });
 
     return NextResponse.json({
       success: true,
       orderNumber: order.orderNumber,
       customerName: order.customerName,
       totalAmount: order.totalAmount,
+      checkoutRequestId: mpesaResult.checkoutRequestId,
     });
 
   } catch (error) {

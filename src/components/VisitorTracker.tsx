@@ -24,11 +24,13 @@ const generateFingerprint = (): string => {
 
 export function VisitorTracker() {
   const visitorIdRef = useRef<string | null>(null);
-  const startTimeRef = useRef<number>(Date.now());
+  const startTimeRef = useRef<number>(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+
+    startTimeRef.current = Date.now();
 
     // 1. Initialize Unique IDs (Local Storage & Session Storage)
     let localStorageId = localStorage.getItem("baratu_visitor_id");

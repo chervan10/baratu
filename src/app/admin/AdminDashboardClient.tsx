@@ -77,6 +77,19 @@ interface OrderItem {
   mercado?: string;
 }
 
+interface Payment {
+  id: string;
+  transactionId: string | null;
+  checkoutRequestId: string;
+  mpesaReference: string | null;
+  amount: number;
+  phoneNumber: string;
+  paymentStatus: string;
+  responseCode: string | null;
+  responseDescription: string | null;
+  createdAt: string;
+}
+
 interface Order {
   id: string;
   orderNumber: string;
@@ -94,9 +107,12 @@ interface Order {
   tax: number;
   discount: number;
   totalAmount: number;
+  paymentMethod: string;
+  paymentStatus: string;
   orderStatus: string;
   createdAt: string;
   items: OrderItem[];
+  payments?: Payment[];
 }
 
 interface AdminDashboardClientProps {
@@ -326,7 +342,7 @@ export default function AdminDashboardClient({ adminEmail }: AdminDashboardClien
       toast.error("Não há encomendas para exportar.");
       return;
     }
-    const headers = ["Nº Encomenda", "Cliente", "E-mail", "Telefone", "Cidade", "Total (MT)", "Estado", "Data"];
+    const headers = ["Nº Encomenda", "Cliente", "E-mail", "Telefone", "Cidade", "Total (MT)", "Estado Encomenda", "Metodo Pagamento", "Estado Pagamento", "Ref M-Pesa", "Data"];
     const rows = [
       headers.join(","),
       ...orders.map(o => [
@@ -337,6 +353,9 @@ export default function AdminDashboardClient({ adminEmail }: AdminDashboardClien
         `"${o.city.replace(/"/g, '""')}"`,
         o.totalAmount,
         o.orderStatus,
+        o.paymentMethod || "M-Pesa",
+        o.paymentStatus || "Pending",
+        o.payments && o.payments[0] ? o.payments[0].mpesaReference || "" : "",
         new Date(o.createdAt).toLocaleDateString("pt-MZ")
       ].join(","))
     ];
@@ -360,9 +379,9 @@ export default function AdminDashboardClient({ adminEmail }: AdminDashboardClien
       ].join("\t")).join("\n");
     } else {
       if (orders.length === 0) return toast.error("Sem dados.");
-      const headers = ["Nº Encomenda", "Cliente", "E-mail", "Telefone", "Cidade", "Total (MT)", "Estado", "Data"];
+      const headers = ["Nº Encomenda", "Cliente", "E-mail", "Telefone", "Cidade", "Total (MT)", "Estado Encomenda", "Metodo Pagamento", "Estado Pagamento", "Ref M-Pesa", "Data"];
       content = headers.join("\t") + "\n" + orders.map(o => [
-        o.orderNumber, o.customerName, o.customerEmail, o.customerPhone, o.city, o.totalAmount, o.orderStatus, new Date(o.createdAt).toLocaleDateString("pt-MZ")
+        o.orderNumber, o.customerName, o.customerEmail, o.customerPhone, o.city, o.totalAmount, o.orderStatus, o.paymentMethod || "M-Pesa", o.paymentStatus || "Pending", o.payments && o.payments[0] ? o.payments[0].mpesaReference || "" : "", new Date(o.createdAt).toLocaleDateString("pt-MZ")
       ].join("\t")).join("\n");
     }
     
@@ -956,7 +975,7 @@ export default function AdminDashboardClient({ adminEmail }: AdminDashboardClien
                   <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Faturação Total</p>
                   <h3 className="text-3xl font-black text-green-800">
                     {orders
-                      .filter(o => o.orderStatus !== "Cancelled")
+                      .filter(o => o.paymentStatus === "Successful" || o.orderStatus === "Paid")
                       .reduce((acc, o) => acc + o.totalAmount, 0)
                       .toFixed(0)} MT
                   </h3>
@@ -1091,7 +1110,8 @@ export default function AdminDashboardClient({ adminEmail }: AdminDashboardClien
                     <tr className="border-b border-gray-100 text-gray-400 text-xs font-bold uppercase tracking-wider bg-gray-50/20">
                       <th className="px-6 py-4">Nº Encomenda</th>
                       <th className="px-6 py-4">Cliente</th>
-                      <th className="px-6 py-4">Localização / Cidade</th>
+                      <th className="px-6 py-4">Método / Ref</th>
+                      <th className="px-6 py-4">Pagamento</th>
                       <th className="px-6 py-4">Total</th>
                       <th className="px-6 py-4">Estado</th>
                       <th className="px-6 py-4 text-right">Data / Hora</th>
@@ -1100,13 +1120,13 @@ export default function AdminDashboardClient({ adminEmail }: AdminDashboardClien
                   <tbody className="divide-y divide-gray-50">
                     {loading ? (
                       <tr>
-                        <td colSpan={6} className="text-center py-12 text-gray-400">
+                        <td colSpan={7} className="text-center py-12 text-gray-400">
                           <RefreshCw size={24} className="animate-spin inline mr-2 text-green-800" /> Carregando...
                         </td>
                       </tr>
                     ) : orders.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="text-center py-12 text-gray-400">
+                        <td colSpan={7} className="text-center py-12 text-gray-400">
                           Nenhuma encomenda registada.
                         </td>
                       </tr>
@@ -1119,6 +1139,13 @@ export default function AdminDashboardClient({ adminEmail }: AdminDashboardClien
                         else if (order.orderStatus === "Delivered") statusColor = "bg-green-50 text-green-800 border-green-200";
                         else if (order.orderStatus === "Cancelled") statusColor = "bg-red-50 text-red-800 border-red-200";
 
+                        let payStatusColor = "bg-gray-50 text-gray-700 border-gray-200";
+                        if (order.paymentStatus === "Successful") payStatusColor = "bg-green-50 text-green-800 border-green-200";
+                        else if (order.paymentStatus === "Failed") payStatusColor = "bg-red-50 text-red-800 border-red-200";
+                        else if (order.paymentStatus === "Pending") payStatusColor = "bg-yellow-50 text-yellow-800 border-yellow-200";
+
+                        const mpesaRef = order.payments && order.payments[0] ? order.payments[0].mpesaReference : null;
+
                         return (
                           <tr 
                             key={order.id}
@@ -1130,10 +1157,13 @@ export default function AdminDashboardClient({ adminEmail }: AdminDashboardClien
                               <span className="font-bold text-gray-800 block">{order.customerName}</span>
                               <span className="text-xs text-gray-400">{order.customerEmail}</span>
                             </td>
-                            <td className="px-6 py-4 text-gray-600 font-medium">
-                              <span className="flex items-center gap-1">
-                                <MapPin size={12} className="text-red-500 shrink-0" />
-                                {order.city}, {order.country}
+                            <td className="px-6 py-4 font-semibold">
+                              <span className="font-bold text-gray-800 block text-xs">{order.paymentMethod || "M-Pesa"}</span>
+                              {mpesaRef && <span className="font-mono text-[10px] text-gray-400 font-bold">{mpesaRef}</span>}
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-black border ${payStatusColor}`}>
+                                {order.paymentStatus || "Pending"}
                               </span>
                             </td>
                             <td className="px-6 py-4 font-bold text-green-800">{order.totalAmount.toFixed(0)} MT</td>
@@ -1375,6 +1405,29 @@ export default function AdminDashboardClient({ adminEmail }: AdminDashboardClien
                   <p className="font-bold text-gray-400 uppercase tracking-widest text-[10px]">{selectedOrder.provinceState ? selectedOrder.provinceState + ", " : ""}{selectedOrder.country}</p>
                 </div>
 
+              </div>
+
+              <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 text-xs grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div>
+                  <span className="text-[10px] text-gray-400 block font-bold uppercase tracking-wider">Método de Pagamento</span>
+                  <span className="font-bold text-gray-800">{selectedOrder.paymentMethod || "M-Pesa"}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-gray-400 block font-bold uppercase tracking-wider">Estado do Pagamento</span>
+                  <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-black border ${
+                    selectedOrder.paymentStatus === "Successful" ? "bg-green-50 text-green-800 border-green-200" :
+                    selectedOrder.paymentStatus === "Failed" ? "bg-red-50 text-red-800 border-red-200" :
+                    "bg-yellow-50 text-yellow-800 border-yellow-200"
+                  }`}>{selectedOrder.paymentStatus || "Pending"}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-gray-400 block font-bold uppercase tracking-wider">Referência M-Pesa</span>
+                  <span className="font-mono font-bold text-gray-800">{selectedOrder.payments && selectedOrder.payments[0]?.mpesaReference ? selectedOrder.payments[0].mpesaReference : "N/A"}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-gray-400 block font-bold uppercase tracking-wider">Transaction ID</span>
+                  <span className="font-mono text-gray-800 break-all">{selectedOrder.payments && selectedOrder.payments[0]?.transactionId ? selectedOrder.payments[0].transactionId : "N/A"}</span>
+                </div>
               </div>
 
               <div>

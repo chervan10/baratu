@@ -14,12 +14,15 @@ export async function GET(request: NextRequest) {
       where: { orderNumber },
       include: {
         items: true,
+        payments: true,
       },
     });
 
     if (!order) {
       return NextResponse.json({ error: "Encomenda não encontrada." }, { status: 404 });
     }
+
+    const successfulPayment = order.payments.find(p => p.paymentStatus === "Successful");
 
     return NextResponse.json({
       orderNumber: order.orderNumber,
@@ -35,6 +38,9 @@ export async function GET(request: NextRequest) {
       tax: order.tax,
       discount: order.discount,
       totalAmount: order.totalAmount,
+      paymentMethod: order.paymentMethod,
+      paymentStatus: order.paymentStatus,
+      mpesaReference: successfulPayment?.mpesaReference || order.payments[0]?.mpesaReference || "N/A",
       items: order.items.map((item) => ({
         productName: item.productName,
         quantity: item.quantity,

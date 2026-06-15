@@ -101,9 +101,9 @@ export default function CheckoutPage() {
       const result = await res.json();
 
       if (res.ok && result.success) {
-        toast.success("Encomenda efetuada com sucesso!");
+        toast.success("A iniciar pagamento M-Pesa...");
         clearCart();
-        router.push(`/checkout/success?orderNumber=${result.orderNumber}&customerName=${encodeURIComponent(result.customerName)}`);
+        router.push(`/checkout/pay?orderNumber=${result.orderNumber}&checkoutRequestId=${result.checkoutRequestId}`);
       } else {
         toast.error(result.error || "Ocorreu um erro ao processar a encomenda.");
       }

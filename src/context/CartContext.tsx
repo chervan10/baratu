@@ -45,19 +45,29 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   // Load cart from localStorage on mount
   useEffect(() => {
+    let stored: string | null = null;
+    let storedCoupon: string | null = null;
     try {
-      const stored = localStorage.getItem("baratu_ecommerce_cart");
-      if (stored) {
-        setCart(JSON.parse(stored));
-      }
-      const storedCoupon = localStorage.getItem("baratu_ecommerce_coupon");
-      if (storedCoupon) {
-        setCouponCode(storedCoupon);
-      }
+      stored = localStorage.getItem("baratu_ecommerce_cart");
+      storedCoupon = localStorage.getItem("baratu_ecommerce_coupon");
     } catch (err) {
       console.error("Error loading cart from localStorage:", err);
     }
-    setIsLoaded(true);
+    
+    // Defer state updates to avoid synchronous setState in effect body
+    setTimeout(() => {
+      if (stored) {
+        try {
+          setCart(JSON.parse(stored));
+        } catch (e) {
+          console.error("Failed parsing cart JSON:", e);
+        }
+      }
+      if (storedCoupon) {
+        setCouponCode(storedCoupon);
+      }
+      setIsLoaded(true);
+    }, 0);
   }, []);
 
   // Save cart to localStorage when it changes

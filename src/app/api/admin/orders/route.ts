@@ -57,6 +57,7 @@ export async function GET(req: NextRequest) {
       where,
       include: {
         items: true,
+        payments: true,
       },
       orderBy: {
         createdAt: "desc",

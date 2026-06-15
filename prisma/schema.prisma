@@ -123,9 +123,12 @@ model Order {
   tax           Float       @default(0)
   discount      Float       @default(0)
   totalAmount   Float       @map("total_amount")
+  paymentMethod String      @default("M-Pesa") @map("payment_method")
+  paymentStatus String      @default("Pending") @map("payment_status") // Pending, Successful, Failed
   orderStatus   String      @default("Pending") @map("order_status") // Pending, Confirmed, Processing, Shipped, Delivered, Cancelled
   createdAt     DateTime    @default(now()) @map("created_at")
   items         OrderItem[]
+  payments      Payment[]
 
   @@map("orders")
 }
@@ -141,6 +144,23 @@ model OrderItem {
   totalPrice  Float  @map("total_price")
 
   @@map("order_items")
+}
+
+model Payment {
+  id                  String   @id @default(uuid())
+  orderId             String   @map("order_id")
+  order               Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  transactionId       String?  @map("transaction_id")
+  checkoutRequestId   String   @map("checkout_request_id")
+  mpesaReference      String?  @map("mpesa_reference")
+  amount              Float
+  phoneNumber         String   @map("phone_number")
+  paymentStatus       String   @default("Pending") @map("payment_status") // Pending, Successful, Failed
+  responseCode        String?  @map("response_code")
+  responseDescription String?  @map("response_description")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  @@map("payments")
 }
 
 
