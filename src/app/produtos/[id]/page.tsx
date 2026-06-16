@@ -4,7 +4,7 @@ import { useRanch } from "@/context/RanchContext";
 import { useCart } from "@/context/CartContext";
 import Image from "next/image";
 import Link from "next/link";
-import { MapPin, ArrowLeft, Plus, Check, ShoppingBasket, LayoutGrid, ShoppingBag } from "lucide-react";
+import { MapPin, ArrowLeft, Plus, Check, ShoppingBasket, LayoutGrid, Truck } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -93,9 +93,9 @@ export default function ProductDetailPage() {
                         addToCart(product, 1, p);
                       }}
                       className="w-12 h-12 rounded-full flex justify-center items-center transition-all bg-green-800 hover:bg-green-700 text-white hover:shadow-md cursor-pointer"
-                      title="Adicionar ao carrinho de compras"
+                      title="Adicionar ao Delivery"
                     >
-                      <ShoppingBag size={20} />
+                      <Truck size={20} />
                     </button>
 
                     <button 

@@ -2,7 +2,7 @@
 import { useState, Suspense } from 'react';
 import { products } from '@/data/produtos';
 import Image from 'next/image';
-import { Search, MapPin, Plus, ShoppingBag } from 'lucide-react';
+import { Search, MapPin, Plus, Truck } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useContext } from 'react';
@@ -125,9 +125,9 @@ function ProdutosContent() {
                                 addToCart(item, 1, p);
                               }}
                               className="bg-green-800 hover:bg-green-700 text-white p-2 rounded-xl transition-colors cursor-pointer flex items-center justify-center shadow-sm"
-                              title="Adicionar ao carrinho de compras"
+                              title="Adicionar ao Delivery"
                             >
-                              <ShoppingBag size={14} />
+                              <Truck size={14} />
                             </button>
                           </div>
                         </div>
