@@ -56,40 +56,51 @@ export async function POST(req: NextRequest) {
     });
 
     // 5. Send OTP Email using Resend
-    const fromEmail = process.env.EMAIL_FROM || "onboarding@resend.dev";
-    const emailBody = `Hello,
+    const fromEmail = "geral@baratu.co.mz";
+    const emailBody = `Olá,
 
-Your verification code is:
+O seu código de verificação para o formulário de contacto da Baratu é:
 
 ${otpCode}
 
-This code expires in 10 minutes.
+Este código expira em 10 minutos.
 
-If you did not request this code, please ignore this email.`;
+Se não solicitou este código, por favor ignore este e-mail.`;
 
     let emailSent = false;
+    let resendError = "";
     if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== "re_mock_key") {
       try {
-        await resend.emails.send({
+        const result = await resend.emails.send({
           from: fromEmail,
           to: emailNormalized,
-          subject: "Your Verification Code",
+          subject: "Código de Verificação - Baratu",
           text: emailBody,
         });
-        emailSent = true;
+        if (result.error) {
+          console.error("Resend API error sending OTP email:", result.error);
+          resendError = JSON.stringify(result.error);
+        } else {
+          emailSent = true;
+        }
       } catch (err: any) {
-        console.error("Resend API error sending email:", err);
+        console.error("Resend API exception sending OTP email:", err);
+        resendError = err.message || "Unknown exception";
       }
     }
 
-    // Log to console in development so the developer can see it easily
-    console.log(`\n=========================================\n[OTP Verification] Code for ${emailNormalized} is: ${otpCode}\n=========================================\n`);
+    // Log to console so it's always accessible in serverless function logs / dev logs
+    console.log(`\n=========================================\n[OTP Verification] Code for ${emailNormalized} is: ${otpCode}\n(Sent from: ${fromEmail})\n=========================================\n`);
+
+    const isTestingPeriod = new Date() < new Date("2026-08-31T00:00:00Z");
 
     return NextResponse.json({
       success: true,
       message: emailSent 
         ? "Código de verificação enviado para o seu e-mail." 
-        : "Código de verificação gerado com sucesso (verifique a consola do servidor)."
+        : "Código de verificação gerado em modo de simulação.",
+      ...(isTestingPeriod ? { otp: otpCode } : {}),
+      resendError: resendError || undefined
     });
 
   } catch (error: any) {

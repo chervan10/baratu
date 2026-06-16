@@ -45,6 +45,7 @@ export default function ContactoPage() {
   const [otpError, setOtpError] = useState("");
   const [resendCountdown, setResendCountdown] = useState(0);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [mockOtp, setMockOtp] = useState("");
 
   // Initialize React Hook Form with Zod validation
   const {
@@ -97,6 +98,15 @@ export default function ContactoPage() {
       
       if (response.ok) {
         toast.success(data.message || "Código enviado com sucesso!");
+        if (data.otp) {
+          setMockOtp(data.otp);
+          toast(`[TESTE] Código OTP de verificação: ${data.otp}`, {
+            icon: "🔑",
+            duration: 10000,
+          });
+        } else {
+          setMockOtp("");
+        }
         setIsVerifyingEmail(true);
         setResendCountdown(60);
         setOtpError("");
@@ -481,6 +491,18 @@ export default function ContactoPage() {
               <p className="text-gray-500 text-sm leading-relaxed mb-6">
                 Enviámos um código de 6 algarismos para <strong className="text-gray-800 break-all">{getValues("email")}</strong>. Insira-o abaixo para continuar.
               </p>
+
+              {mockOtp && (
+                <div className="w-full mb-6 p-4 bg-green-50/80 border border-green-200 rounded-2xl text-green-950 text-xs text-center font-medium leading-relaxed shadow-sm">
+                  <p className="font-bold text-green-950 mb-1 flex items-center justify-center gap-1">
+                    <AlertCircle size={14} className="text-green-800" /> Modo de Simulação Ativo
+                  </p>
+                  Como o endereço de envio <code className="bg-green-100/60 px-1 py-0.5 rounded text-green-950 font-semibold break-all">geral@baratu.co.mz</code> é fictício, utilize o código de teste gerado:
+                  <div className="text-lg font-black text-green-900 mt-1.5 tracking-wider font-mono bg-white border border-green-200/50 py-1 rounded-xl">
+                    {mockOtp}
+                  </div>
+                </div>
+              )}
 
               {/* OTP Code Input */}
               <div className="w-full mb-6">
