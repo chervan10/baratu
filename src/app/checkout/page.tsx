@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import toast from "react-hot-toast";
 import Link from "next/link";
-import { ArrowLeft, ShoppingBag, CreditCard, ClipboardCheck, Lock, RefreshCw, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, ShoppingBag, CreditCard, ClipboardCheck, Lock, RefreshCw, CheckCircle2, X } from "lucide-react";
 
 // Form Validation Schema
 const checkoutFormSchema = z.object({
@@ -45,6 +45,10 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState<"billing" | "review">("billing");
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [isMpesaModalOpen, setIsMpesaModalOpen] = useState(false);
+  const [mpesaNumber, setMpesaNumber] = useState("");
+  const [mpesaError, setMpesaError] = useState("");
+  const [formData, setFormData] = useState<CheckoutFormValues | null>(null);
 
   const {
     register,
@@ -87,16 +91,41 @@ export default function CheckoutPage() {
     setStep("review");
   };
 
-  const onFormSubmit = async (data: CheckoutFormValues) => {
+  const onFormSubmit = (data: CheckoutFormValues) => {
     if (!termsAccepted) {
       toast.error("Por favor, confirme a encomenda assinalando a caixa de verificação.");
       return;
     }
 
+    setFormData(data);
+    setMpesaNumber(data.customerPhone);
+    setMpesaError("");
+    setIsMpesaModalOpen(true);
+  };
+
+  const handleConfirmMpesaPayment = async () => {
+    if (!formData) return;
+
+    const clean = mpesaNumber.replace(/[\s-]/g, "");
+    if (!/^(\+?258)?(84|85)\d{7}$/.test(clean)) {
+      setMpesaError("Apenas números M-Pesa da Vodacom (prefixo 84 ou 85) são permitidos.");
+      return;
+    }
+
+    // Format phone to standard +258XXXXXXXXX
+    let formattedPhone = clean;
+    const match = clean.match(/^(\+?258)?((84|85)\d{7})$/);
+    if (match) {
+      formattedPhone = `+258${match[2]}`;
+    }
+
     setSubmitting(true);
+    setMpesaError("");
+
     try {
       const payload = {
-        ...data,
+        ...formData,
+        customerPhone: formattedPhone,
         couponCode,
         cartItems: cart.map((item) => ({
           productId: item.productId,
@@ -118,13 +147,16 @@ export default function CheckoutPage() {
       if (res.ok && result.success) {
         toast.success("A iniciar pagamento M-Pesa...");
         clearCart();
+        setIsMpesaModalOpen(false);
         router.push(`/checkout/pay?orderNumber=${result.orderNumber}&checkoutRequestId=${result.checkoutRequestId}`);
       } else {
         toast.error(result.error || "Ocorreu um erro ao processar a encomenda.");
+        setMpesaError(result.error || "Erro ao processar o pagamento.");
       }
     } catch (err) {
       console.error(err);
       toast.error("Erro de rede. Por favor, tente novamente.");
+      setMpesaError("Erro de ligação ao servidor.");
     } finally {
       setSubmitting(false);
     }
@@ -462,6 +494,100 @@ export default function CheckoutPage() {
         </div>
 
       </form>
+
+      {/* M-Pesa Modal Overlay */}
+      {isMpesaModalOpen && (
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4 transition-all duration-300 animate-in fade-in">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-gray-100 flex flex-col relative animate-in zoom-in-95 duration-300">
+            
+            {/* Close Button */}
+            <button 
+              type="button"
+              disabled={submitting}
+              onClick={() => setIsMpesaModalOpen(false)}
+              className="absolute right-6 top-6 text-gray-400 hover:text-gray-600 transition-colors p-1 hover:bg-gray-50 rounded-full cursor-pointer disabled:opacity-50"
+            >
+              <X size={20} />
+            </button>
+
+            {/* Header / Brand */}
+            <div className="flex flex-col items-center text-center mt-2">
+              <div className="bg-red-50 text-red-600 w-16 h-16 rounded-full flex items-center justify-center font-black text-2xl mb-4 border border-red-100 shadow-sm animate-bounce">
+                M
+              </div>
+              <h2 className="text-2xl font-black text-gray-900">Pagamento M-Pesa</h2>
+              <p className="text-gray-500 text-xs mt-2 leading-relaxed">
+                Para finalizar a sua compra no valor total de <strong className="text-green-800 font-extrabold">{totalAmount.toFixed(0)} MT</strong>, confirme o seu número de telefone M-Pesa.
+              </p>
+            </div>
+
+            {/* Input Field */}
+            <div className="mt-6 space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-wider">Número de Telefone M-Pesa</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-gray-400 font-bold">
+                    +258
+                  </span>
+                  <input
+                    type="tel"
+                    disabled={submitting}
+                    value={mpesaNumber.replace(/^\+258\s?/, "")}
+                    onChange={(e) => {
+                      const cleanInput = e.target.value.replace(/\D/g, "");
+                      setMpesaNumber(`+258 ${cleanInput}`);
+                      setMpesaError("");
+                    }}
+                    className={`w-full pl-16 pr-4 py-3 bg-gray-50 border rounded-2xl text-sm font-bold tracking-wider outline-none transition-all ${
+                      mpesaError ? "border-red-500 focus:ring-2 focus:ring-red-100" : "border-gray-200 focus:ring-2 focus:ring-green-100 focus:border-green-800"
+                    }`}
+                    placeholder="84 123 4567"
+                  />
+                </div>
+                {mpesaError && (
+                  <p className="text-xs text-red-500 mt-2 font-semibold flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" /> {mpesaError}
+                  </p>
+                )}
+              </div>
+
+              <div className="bg-yellow-50 border border-yellow-100 rounded-2xl p-4 text-[10px] text-yellow-800 font-bold leading-relaxed">
+                Nota: Irá receber uma mensagem no telemóvel para autorizar o pagamento. Certifique-se de que o telemóvel está ativo e possui saldo suficiente.
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="mt-8 flex flex-col gap-3">
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={handleConfirmMpesaPayment}
+                className="w-full py-4 bg-green-800 hover:bg-green-700 text-white font-extrabold text-sm rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-95 cursor-pointer disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                {submitting ? (
+                  <>
+                    <RefreshCw className="animate-spin" size={16} /> A Processar...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={16} /> Confirmar & Pagar
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => setIsMpesaModalOpen(false)}
+                className="w-full py-3.5 bg-gray-50 hover:bg-gray-100 text-gray-500 font-bold text-xs rounded-2xl transition-all cursor-pointer text-center disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );
