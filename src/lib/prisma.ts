@@ -2,17 +2,40 @@ import { PrismaClient } from '@prisma/client'
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
+import fs from 'fs'
+import path from 'path'
 
 const prismaClientSingleton = () => {
-  const url = process.env.DATABASE_URL || 'file:./dev.db';
+  const url = process.env.DATABASE_URL || '';
 
   if (url.startsWith('postgresql:') || url.startsWith('postgres:')) {
     const pool = new Pool({ connectionString: url });
     const adapter = new PrismaPg(pool);
     return new PrismaClient({ adapter });
   } else {
+    let dbPath = path.join(process.cwd(), 'dev.db');
+
+    // On Vercel, the runtime workspace is read-only, so we copy dev.db to /tmp
+    if (process.env.VERCEL) {
+      const tempDbPath = '/tmp/dev.db';
+      if (!fs.existsSync(tempDbPath)) {
+        try {
+          if (fs.existsSync(dbPath)) {
+            fs.copyFileSync(dbPath, tempDbPath);
+            console.log('Successfully copied dev.db to /tmp/dev.db');
+          } else {
+            console.warn('dev.db not found at', dbPath);
+          }
+        } catch (e) {
+          console.error('Failed to copy dev.db to /tmp:', e);
+        }
+      }
+      dbPath = tempDbPath;
+    }
+
+    const sqliteUrl = `file:${dbPath}`;
     return new PrismaClient({
-      adapter: new PrismaBetterSqlite3({ url }),
+      adapter: new PrismaBetterSqlite3({ url: sqliteUrl }),
     });
   }
 }
