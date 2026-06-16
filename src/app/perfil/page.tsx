@@ -20,6 +20,9 @@ export default async function PerfilPage() {
       <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 mb-8 flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-black text-gray-900 mb-2">Olá, {user.name}</h1>
+          <p className="text-sm font-bold text-green-800 bg-green-50 w-max px-3 py-1 rounded-full mb-2 border border-green-100">
+            @{user.username || 'sem_username'}
+          </p>
           <p className="text-gray-600">{user.email}</p>
         </div>
         <LogoutConfirmationModal />

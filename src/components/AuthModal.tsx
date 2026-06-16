@@ -1,13 +1,68 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { loginUser, registerUser } from "@/app/actions/auth";
 import { usePathname } from "next/navigation";
-import { X, Mail, Lock, User, KeyRound, ShoppingBasket } from "lucide-react";
+import { X, Mail, Lock, User, KeyRound, ShoppingBasket, Loader2, CheckCircle, XCircle, AtSign } from "lucide-react";
 
 export function AuthModal() {
   const { showAuthModal, authView, openAuthModal, closeAuthModal } = useAuth();
   const pathname = usePathname();
+
+  const [username, setUsername] = useState("");
+  const [isChecking, setIsChecking] = useState(false);
+  const [usernameError, setUsernameError] = useState("");
+  const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!username) {
+      setUsernameError("");
+      setIsAvailable(null);
+      return;
+    }
+
+    const trimmed = username.toLowerCase().trim();
+    if (trimmed.length < 3) {
+      setUsernameError("O nome de utilizador deve ter pelo menos 3 caracteres.");
+      setIsAvailable(null);
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9_\-]+$/.test(trimmed)) {
+      setUsernameError("Apenas letras, números, sublinhados (_) e hífenes (-) são permitidos.");
+      setIsAvailable(null);
+      return;
+    }
+
+    setUsernameError("");
+    setIsAvailable(null);
+    setIsChecking(true);
+
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/auth/check-username?username=${encodeURIComponent(trimmed)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.available) {
+            setIsAvailable(true);
+            setUsernameError("");
+          } else {
+            setIsAvailable(false);
+            setUsernameError("Este nome de utilizador já está em uso.");
+          }
+        }
+      } catch (err) {
+        console.error("Erro ao verificar nome de utilizador:", err);
+      } finally {
+        setIsChecking(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [username]);
+
+  const isFormInvalid = isChecking || isAvailable === false || !!usernameError || !username;
 
   if (!showAuthModal) return null;
 
@@ -113,8 +168,15 @@ export function AuthModal() {
             </button>
           </form>
         ) : (
-          /* Register Form */
-          <form className="space-y-4" action={registerUser}>
+          <form 
+            className="space-y-4" 
+            action={registerUser}
+            onSubmit={(e) => {
+              if (isFormInvalid) {
+                e.preventDefault();
+              }
+            }}
+          >
             <input type="hidden" name="redirectTo" value={pathname} />
 
             <div>
@@ -132,6 +194,36 @@ export function AuthModal() {
                   className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-green-100 focus:border-green-800 transition-all placeholder:text-gray-400 text-gray-900"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                Nome de utilizador (Username)
+              </label>
+              <div className="relative">
+                <AtSign className="absolute left-3.5 top-3.5 text-gray-400" size={18} />
+                <input
+                  name="username"
+                  type="text"
+                  placeholder="ex: joao_silva"
+                  required
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full pl-11 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-green-100 focus:border-green-800 transition-all placeholder:text-gray-400 text-gray-900"
+                />
+                <div className="absolute right-3.5 top-3.5 flex items-center">
+                  {isChecking && <Loader2 className="animate-spin text-gray-400" size={16} />}
+                  {!isChecking && isAvailable === true && <CheckCircle className="text-green-600" size={16} />}
+                  {!isChecking && (isAvailable === false || !!usernameError) && username && <XCircle className="text-red-500" size={16} />}
+                </div>
+              </div>
+              {username && (
+                <div className="mt-1.5 text-[10px] font-bold">
+                  {isChecking && <span className="text-gray-500">A verificar...</span>}
+                  {!isChecking && isAvailable === true && <span className="text-green-600">Disponível!</span>}
+                  {!isChecking && usernameError && <span className="text-red-500">{usernameError}</span>}
+                </div>
+              )}
             </div>
 
             <div>
@@ -171,7 +263,12 @@ export function AuthModal() {
 
             <button
               type="submit"
-              className="w-full mt-2 py-3.5 bg-green-800 hover:bg-green-700 text-white font-extrabold text-sm rounded-2xl shadow-md transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
+              disabled={isFormInvalid}
+              className={`w-full mt-2 py-3.5 font-extrabold text-sm rounded-2xl shadow-md transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2 ${
+                isFormInvalid
+                  ? "bg-gray-400 text-white cursor-not-allowed"
+                  : "bg-green-800 hover:bg-green-700 text-white"
+              }`}
             >
               Criar Conta Grátis
             </button>

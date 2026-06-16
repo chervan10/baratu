@@ -9,27 +9,45 @@ import { cookies } from "next/headers";
 export async function registerUser(formData: FormData) {
   const name = formData.get("name") as string;
   const email = formData.get("email") as string;
+  const username = formData.get("username") as string;
   const password = formData.get("password") as string;
   const redirectTo = (formData.get("redirectTo") as string) || "/?success=profile_created";
 
-  if (!email || !password || !name) {
+  if (!email || !password || !name || !username) {
     redirect(`/register?error=Todos os campos são obrigatórios.&redirectTo=${encodeURIComponent(redirectTo)}`);
   }
 
   const emailNormalized = email.toLowerCase().trim();
+  const usernameNormalized = username.toLowerCase().trim();
 
-  let existingUser;
+  if (usernameNormalized.length < 3) {
+    redirect(`/register?error=O nome de utilizador deve ter pelo menos 3 caracteres.&redirectTo=${encodeURIComponent(redirectTo)}`);
+  }
+
+  if (!/^[a-zA-Z0-9_\-]+$/.test(usernameNormalized)) {
+    redirect(`/register?error=O nome de utilizador apenas pode conter letras, números, sublinhados e hífenes.&redirectTo=${encodeURIComponent(redirectTo)}`);
+  }
+
+  let existingUserByEmail;
+  let existingUserByUsername;
   try {
-    existingUser = await prisma.user.findUnique({
+    existingUserByEmail = await prisma.user.findUnique({
       where: { email: emailNormalized },
+    });
+    existingUserByUsername = await prisma.user.findUnique({
+      where: { username: usernameNormalized },
     });
   } catch (dbError) {
     console.error("Database error during registration:", dbError);
     redirect(`/register?error=Erro de ligação à base de dados. Tente mais tarde.&redirectTo=${encodeURIComponent(redirectTo)}`);
   }
 
-  if (existingUser) {
+  if (existingUserByEmail) {
     redirect(`/register?error=Este e-mail já está em uso.&redirectTo=${encodeURIComponent(redirectTo)}`);
+  }
+
+  if (existingUserByUsername) {
+    redirect(`/register?error=Este nome de utilizador já está em uso.&redirectTo=${encodeURIComponent(redirectTo)}`);
   }
 
   let hashedPassword;
@@ -46,6 +64,7 @@ export async function registerUser(formData: FormData) {
       data: {
         name,
         email: emailNormalized,
+        username: usernameNormalized,
         password: hashedPassword,
       },
     });
