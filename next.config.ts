@@ -6,6 +6,17 @@ const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: false,
   turbopack: {},
+  outputFileTracingIncludes: {
+    '/api/**/*': ['./dev.db'],
+    '/admin/**/*': ['./dev.db'],
+    '/checkout/**/*': ['./dev.db'],
+    '/checkout': ['./dev.db'],
+    '/visitors': ['./dev.db'],
+    '/rota': ['./dev.db'],
+    '/perfil': ['./dev.db'],
+    '/analytics': ['./dev.db'],
+    '/': ['./dev.db'],
+  },
 };
 
 // @ts-ignore
