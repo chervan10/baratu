@@ -111,7 +111,10 @@ export default function ContactoPage() {
         setResendCountdown(60);
         setOtpError("");
       } else {
-        toast.error(data.error || "Erro ao solicitar código de verificação.");
+        const errorMsg = data.details 
+          ? `${data.error || "Erro"}: ${data.details}` 
+          : (data.error || "Erro ao solicitar código de verificação.");
+        toast.error(errorMsg);
       }
     } catch (err) {
       console.error(err);
@@ -149,7 +152,10 @@ export default function ContactoPage() {
         setIsVerifyingEmail(false);
         setOtpCodeInput("");
       } else {
-        setOtpError(data.error || "Código incorreto. Tente novamente.");
+        const errorMsg = data.details 
+          ? `${data.error || "Erro"}: ${data.details}` 
+          : (data.error || "Código incorreto. Tente novamente.");
+        setOtpError(errorMsg);
       }
     } catch (err) {
       console.error(err);
@@ -192,7 +198,10 @@ export default function ContactoPage() {
         setEmailVerified(false);
         setVerifiedEmailValue("");
       } else {
-        toast.error(resData.error || "Erro ao enviar a sua mensagem.");
+        const errorMsg = resData.details 
+          ? `${resData.error || "Erro"}: ${resData.details}` 
+          : (resData.error || "Erro ao enviar a sua mensagem.");
+        toast.error(errorMsg);
       }
     } catch (err) {
       console.error(err);

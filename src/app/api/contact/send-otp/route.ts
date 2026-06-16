@@ -30,9 +30,12 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    if (otpCount >= 3) {
+    const isTestingPeriod = new Date() < new Date("2026-08-31T00:00:00Z");
+    const limit = isTestingPeriod ? 100 : 3;
+
+    if (otpCount >= limit) {
       return NextResponse.json(
-        { error: "Limite de envios excedido. Tente novamente mais tarde (máximo de 3 códigos por hora)." },
+        { error: `Limite de envios excedido. Tente novamente mais tarde (máximo de ${limit} códigos por hora).` },
         { status: 429 }
       );
     }
@@ -91,8 +94,6 @@ Se não solicitou este código, por favor ignore este e-mail.`;
 
     // Log to console so it's always accessible in serverless function logs / dev logs
     console.log(`\n=========================================\n[OTP Verification] Code for ${emailNormalized} is: ${otpCode}\n(Sent from: ${fromEmail})\n=========================================\n`);
-
-    const isTestingPeriod = new Date() < new Date("2026-08-31T00:00:00Z");
 
     return NextResponse.json({
       success: true,
