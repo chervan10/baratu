@@ -1,18 +1,19 @@
+import crypto from "crypto";
 import prisma from "./prisma";
 
 // M-Pesa Environment variables
-const apiBaseUrl = process.env.MPESA_API_BASE_URL;
-const consumerKey = process.env.MPESA_CONSUMER_KEY;
-const consumerSecret = process.env.MPESA_CONSUMER_SECRET;
-const apiUser = process.env.MPESA_API_USER;
-const apiPassword = process.env.MPESA_API_PASSWORD;
+const mpesaPublicKey = process.env.MPESA_PUBLIC_KEY;
+const mpesaApiHost = process.env.MPESA_API_HOST;
+const mpesaApiKey = process.env.MPESA_API_KEY;
+const mpesaOrigin = process.env.MPESA_ORIGIN || "developer.mpesa.vm.co.mz";
+const mpesaServiceProviderCode = process.env.MPESA_SERVICE_PROVIDER_CODE || "171717";
 const callbackUrl = process.env.MPESA_CALLBACK_URL || "http://localhost:3000/api/payment/callback";
 
 // Flag to determine if real API or Simulator should run
-const isSimulator = !apiBaseUrl || !consumerKey || !consumerSecret;
+const isSimulator = process.env.MPESA_SIMULATOR === "true" || !mpesaPublicKey || !mpesaApiHost || !mpesaApiKey;
 
 if (isSimulator) {
-  console.warn("WARNING: M-Pesa credentials not configured. M-Pesa API will run in sandbox SIMULATOR MODE.");
+  console.warn("WARNING: M-Pesa credentials not configured or MPESA_SIMULATOR is set. M-Pesa API will run in sandbox SIMULATOR MODE.");
 }
 
 interface MpesaInitiateResponse {
@@ -32,6 +33,19 @@ interface MpesaVerifyResponse {
 }
 
 /**
+ * Constructs the M-Pesa base URL dynamically.
+ * C2B uses port 18352 in Sandbox, Status Query uses port 18353.
+ */
+function getMpesaBaseUrl(service: "c2b" | "query"): string {
+  const host = mpesaApiHost || "api.sandbox.vm.co.mz";
+  if (host.includes("sandbox")) {
+    const port = service === "c2b" ? "18352" : "18353";
+    return `https://${host}:${port}`;
+  }
+  return `https://${host}`;
+}
+
+/**
  * Retrieves access token from M-Pesa IPG.
  */
 export async function getMpesaAccessToken(): Promise<string | null> {
@@ -39,24 +53,31 @@ export async function getMpesaAccessToken(): Promise<string | null> {
     return "mock_access_token_123456";
   }
 
-  try {
-    const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString("base64");
-    const response = await fetch(`${apiBaseUrl}/oauth/v1/generate?grant_type=client_credentials`, {
-      method: "GET",
-      headers: {
-        Authorization: `Basic ${auth}`,
-      },
-    });
+  if (!mpesaPublicKey || !mpesaApiKey) {
+    console.error("M-Pesa public key or API key not configured.");
+    return null;
+  }
 
-    if (!response.ok) {
-      console.error("M-Pesa Auth failed:", await response.text());
-      return null;
+  try {
+    let pemKey = mpesaPublicKey.trim();
+    if (!pemKey.includes("-----BEGIN PUBLIC KEY-----")) {
+      const cleanKey = pemKey.replace(/[\s\r\n]+/g, "");
+      const chunks = cleanKey.match(/.{1,64}/g) || [];
+      pemKey = `-----BEGIN PUBLIC KEY-----\n${chunks.join("\n")}\n-----END PUBLIC KEY-----`;
     }
 
-    const data = await response.json();
-    return data.access_token || null;
+    const buffer = Buffer.from(mpesaApiKey);
+    const encrypted = crypto.publicEncrypt(
+      {
+        key: pemKey,
+        padding: crypto.constants.RSA_PKCS1_PADDING,
+      },
+      buffer
+    );
+
+    return encrypted.toString("base64");
   } catch (error) {
-    console.error("Exception fetching M-Pesa Access Token:", error);
+    console.error("Exception generating M-Pesa Access Token:", error);
     return null;
   }
 }
@@ -125,35 +146,52 @@ export async function initiateMpesaPayment(
       };
     }
 
-    // Example payload for Vodacom Moz Lipa Na M-Pesa/C2B Single Stage Transaction API
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+    });
+    const orderNumber = order ? order.orderNumber : orderId;
+    const cleanOrderNumber = orderNumber.replace(/[\s-]/g, "");
+
     const payload = {
-      input_TransactionReference: orderId.slice(0, 10),
+      input_TransactionReference: cleanOrderNumber.slice(0, 10),
       input_CustomerMSISDN: cleanPhone.startsWith("258") ? cleanPhone : `258${cleanPhone}`,
       input_Amount: amount.toFixed(2),
-      input_ThirdPartyReference: orderId,
-      input_ServiceProviderCode: apiUser || "171717",
-      input_Password: apiPassword || "password",
-      input_CallbackURL: callbackUrl,
+      input_ThirdPartyReference: cleanOrderNumber,
+      input_ServiceProviderCode: mpesaServiceProviderCode,
     };
 
-    const response = await fetch(`${apiBaseUrl}/ipg/v1x/v1/c2bPayment/`, {
+    const baseUrl = getMpesaBaseUrl("c2b");
+    const response = await fetch(`${baseUrl}/ipg/v1x/c2bPayment/singleStage/`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
+        "Authorization": `Bearer ${accessToken}`,
+        "Origin": mpesaOrigin,
       },
       body: JSON.stringify(payload),
     });
 
-    const data = await response.json();
+    const text = await response.text();
+    let data: any = {};
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      console.error("M-Pesa API C2B response is not valid JSON. Status:", response.status, "Raw response:", text);
+      return {
+        success: false,
+        checkoutRequestId: "",
+        responseCode: response.status.toString(),
+        responseDescription: `M-Pesa server returned status ${response.status}: ${response.statusText}`,
+      };
+    }
 
     if (!response.ok) {
       console.error("M-Pesa payment initiation API error:", data);
       return {
         success: false,
         checkoutRequestId: "",
-        responseCode: data.output_ResponseCode || "500",
-        responseDescription: data.output_ResponseDesc || "Payment initiation failed.",
+        responseCode: data.output_ResponseCode || response.status.toString(),
+        responseDescription: data.output_ResponseDesc || `Payment initiation failed with status ${response.status}.`,
       };
     }
 
@@ -183,7 +221,6 @@ export async function verifyMpesaTransaction(
   checkoutRequestId: string
 ): Promise<MpesaVerifyResponse> {
   if (isSimulator || checkoutRequestId.startsWith("mock_")) {
-    // Check if we already marked it successful in database
     const payment = await prisma.payment.findFirst({
       where: { checkoutRequestId },
     });
@@ -216,22 +253,48 @@ export async function verifyMpesaTransaction(
       };
     }
 
-    const response = await fetch(`${apiBaseUrl}/ipg/v1x/v1/queryTransactionStatus/?conversationID=${checkoutRequestId}`, {
+    const payment = await prisma.payment.findFirst({
+      where: { checkoutRequestId },
+      include: { order: true },
+    });
+    const rawRef = payment?.order?.orderNumber || payment?.orderId || "N/A";
+    const thirdPartyReference = rawRef.replace(/[\s-]/g, "");
+
+    const baseUrl = getMpesaBaseUrl("query");
+    const url = new URL(`${baseUrl}/ipg/v1x/queryTransactionStatus/`);
+    url.searchParams.set("input_QueryReference", checkoutRequestId);
+    url.searchParams.set("input_ServiceProviderCode", mpesaServiceProviderCode);
+    url.searchParams.set("input_ThirdPartyReference", thirdPartyReference);
+
+    const response = await fetch(url.toString(), {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        "Authorization": `Bearer ${accessToken}`,
+        "Origin": mpesaOrigin,
       },
     });
 
-    const data = await response.json();
+    const text = await response.text();
+    let data: any = {};
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      console.error("M-Pesa transaction query response is not valid JSON. Status:", response.status, "Raw response:", text);
+      return {
+        success: false,
+        paymentStatus: "Pending",
+        responseCode: response.status.toString(),
+        responseDescription: `M-Pesa server status ${response.status}: ${response.statusText}`,
+      };
+    }
 
     if (!response.ok) {
       console.error("M-Pesa transaction query error:", data);
       return {
         success: false,
         paymentStatus: "Pending",
-        responseCode: data.output_ResponseCode || "500",
-        responseDescription: data.output_ResponseDesc || "Status query failed.",
+        responseCode: data.output_ResponseCode || response.status.toString(),
+        responseDescription: data.output_ResponseDesc || `Status query failed with status ${response.status}.`,
       };
     }
 
