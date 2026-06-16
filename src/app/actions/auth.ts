@@ -10,9 +10,10 @@ export async function registerUser(formData: FormData) {
   const name = formData.get("name") as string;
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
+  const redirectTo = (formData.get("redirectTo") as string) || "/?success=profile_created";
 
   if (!email || !password || !name) {
-    redirect("/register?error=Todos os campos são obrigatórios.");
+    redirect(`/register?error=Todos os campos são obrigatórios.&redirectTo=${encodeURIComponent(redirectTo)}`);
   }
 
   const emailNormalized = email.toLowerCase().trim();
@@ -24,11 +25,11 @@ export async function registerUser(formData: FormData) {
     });
   } catch (dbError) {
     console.error("Database error during registration:", dbError);
-    redirect("/register?error=Erro de ligação à base de dados. Tente mais tarde.");
+    redirect(`/register?error=Erro de ligação à base de dados. Tente mais tarde.&redirectTo=${encodeURIComponent(redirectTo)}`);
   }
 
   if (existingUser) {
-    redirect("/register?error=Este e-mail já está em uso.");
+    redirect(`/register?error=Este e-mail já está em uso.&redirectTo=${encodeURIComponent(redirectTo)}`);
   }
 
   let hashedPassword;
@@ -36,7 +37,7 @@ export async function registerUser(formData: FormData) {
     hashedPassword = await bcrypt.hash(password, 10);
   } catch (err) {
     console.error("Error hashing password:", err);
-    redirect("/register?error=Erro ao processar palavra-passe.");
+    redirect(`/register?error=Erro ao processar palavra-passe.&redirectTo=${encodeURIComponent(redirectTo)}`);
   }
 
   let user;
@@ -50,16 +51,16 @@ export async function registerUser(formData: FormData) {
     });
   } catch (dbError) {
     console.error("Database error during user creation:", dbError);
-    redirect("/register?error=Erro ao criar conta na base de dados.");
+    redirect(`/register?error=Erro ao criar conta na base de dados.&redirectTo=${encodeURIComponent(redirectTo)}`);
   }
 
   try {
     await setSession(user.id);
   } catch (err) {
     console.error("Error setting session during registration:", err);
-    redirect("/register?error=Erro ao iniciar sessão após registo.");
+    redirect(`/register?error=Erro ao iniciar sessão após registo.&redirectTo=${encodeURIComponent(redirectTo)}`);
   }
-  redirect("/?success=profile_created");
+  redirect(redirectTo);
 }
 
 export async function loginUser(formData: FormData) {

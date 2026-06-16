@@ -8,6 +8,7 @@ import { useSearchParams } from 'next/navigation';
 import { useContext } from 'react';
 import { useRanch } from '@/context/RanchContext';
 import { useCart } from '@/context/CartContext';
+import { useAuth } from '@/context/AuthContext';
 import toast from 'react-hot-toast';
 
 function ProdutosContent() {
@@ -18,6 +19,7 @@ function ProdutosContent() {
   const [selectedCategory, setSelectedCategory] = useState("Todos");
   const { addToRoute } = useRanch();
   const { addToCart } = useCart();
+  const { checkAuth } = useAuth();
 
   const categories = ["Todos", ...Array.from(new Set(products.map(p => p.categoria)))];
 
@@ -28,6 +30,7 @@ function ProdutosContent() {
   });
 
   const handleAddToCart = (product: typeof products[0]) => {
+    if (!checkAuth()) return;
     const cheapestPrice = product.precos.reduce((min, p) => p.valor < min.valor ? p : min);
     const cartItem = {
       id: product.id,
@@ -118,6 +121,7 @@ function ProdutosContent() {
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
+                                if (!checkAuth()) return;
                                 addToCart(item, 1, p);
                               }}
                               className="bg-green-800 hover:bg-green-700 text-white p-2 rounded-xl transition-colors cursor-pointer flex items-center justify-center shadow-sm"

@@ -7,12 +7,14 @@ import Link from "next/link";
 import { MapPin, ArrowLeft, Plus, Check, ShoppingBasket, LayoutGrid, ShoppingBag } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useAuth } from "@/context/AuthContext";
 
 export default function ProductDetailPage() {
   const params = useParams();
   const id = parseInt(params.id as string);
   const { cart, addToRoute, removeFromRoute } = useRanch();
   const { addToCart } = useCart();
+  const { checkAuth } = useAuth();
   const [sugestoes, setSugestoes] = useState<typeof products>([]);
 
   const product = products.find(p => p.id === id);
@@ -86,7 +88,10 @@ export default function ProductDetailPage() {
                     </div>
 
                     <button 
-                      onClick={() => addToCart(product, 1, p)}
+                      onClick={() => {
+                        if (!checkAuth()) return;
+                        addToCart(product, 1, p);
+                      }}
                       className="w-12 h-12 rounded-full flex justify-center items-center transition-all bg-green-800 hover:bg-green-700 text-white hover:shadow-md cursor-pointer"
                       title="Adicionar ao carrinho de compras"
                     >
@@ -98,6 +103,7 @@ export default function ProductDetailPage() {
                         if (inCart) {
                           removeFromRoute(product.id, p.mercado);
                         } else {
+                          if (!checkAuth()) return;
                           addToRoute({
                             ...product,
                             mercado: p.mercado,
@@ -156,6 +162,7 @@ export default function ProductDetailPage() {
                         if (isItemInCart) {
                           removeFromRoute(item.id, melhorPrecoObj.mercado);
                         } else {
+                          if (!checkAuth()) return;
                           addToRoute({
                             ...item,
                             mercado: melhorPrecoObj.mercado,

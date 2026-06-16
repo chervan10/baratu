@@ -1,10 +1,12 @@
 "use client";
+
 import Link from "next/link";
 import { products } from "@/data/produtos";
 import Image from "next/image";
 import { Search, MapPin, TrendingDown, Plus } from "lucide-react";
 import NotificationToast from "./NotificationToast";
 import { useRanch } from "@/context/RanchContext";
+import { useAuth } from "@/context/AuthContext";
 import { MessageModal } from "@/components/MessageModal";
 import toast from "react-hot-toast";
 import { useEffect, useState } from "react";
@@ -16,6 +18,7 @@ export default function Home({ searchParams }: { searchParams: Promise<{ success
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [destaques, setDestaques] = useState<typeof products>([]);
   const { addToRoute } = useRanch();
+  const { checkAuth } = useAuth();
   const [isSearching, setIsSearching] = useState(false);
   const router = useRouter();
 
@@ -36,6 +39,7 @@ export default function Home({ searchParams }: { searchParams: Promise<{ success
   }, []);
 
   const handleAddToCart = (product: typeof products[0]) => {
+    if (!checkAuth()) return;
     const cheapestPrice = product.precos.reduce((min, p) => p.valor < min.valor ? p : min);
     const cartItem = {
       id: product.id,
