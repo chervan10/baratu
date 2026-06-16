@@ -100,6 +100,8 @@ CREATE TABLE orders (
     tax NUMERIC DEFAULT 0 NOT NULL,
     discount NUMERIC DEFAULT 0 NOT NULL,
     total_amount NUMERIC NOT NULL,
+    payment_method TEXT DEFAULT 'M-Pesa' NOT NULL,
+    payment_status TEXT DEFAULT 'Pending' NOT NULL,
     order_status TEXT DEFAULT 'Pending' NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
@@ -115,21 +117,42 @@ CREATE TABLE order_items (
     total_price NUMERIC NOT NULL
 );
 
+-- Create table for payments
+CREATE TABLE payments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    transaction_id TEXT,
+    checkout_request_id TEXT NOT NULL,
+    mpesa_reference TEXT,
+    amount NUMERIC NOT NULL,
+    phone_number TEXT NOT NULL,
+    payment_status TEXT DEFAULT 'Pending' NOT NULL,
+    response_code TEXT,
+    response_description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 -- Indexes for performance
 CREATE INDEX idx_orders_order_number ON orders(order_number);
 CREATE INDEX idx_orders_customer_email ON orders(customer_email);
 CREATE INDEX idx_orders_created_at ON orders(created_at);
 CREATE INDEX idx_order_items_order_id ON order_items(order_id);
+CREATE INDEX idx_payments_order_id ON payments(order_id);
+CREATE INDEX idx_payments_checkout_request_id ON payments(checkout_request_id);
 
 -- Enable RLS (Row Level Security)
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 
--- Order insertion policies (Public/Anon users can checkout)
+-- Order & Payment insertion policies (Public/Anon users can checkout)
 CREATE POLICY "Allow public insert orders" ON orders
     FOR INSERT TO anon, authenticated WITH CHECK (true);
 
 CREATE POLICY "Allow public insert order_items" ON order_items
+    FOR INSERT TO anon, authenticated WITH CHECK (true);
+
+CREATE POLICY "Allow public insert payments" ON payments
     FOR INSERT TO anon, authenticated WITH CHECK (true);
 
 -- Admin read/write policies
@@ -141,5 +164,9 @@ CREATE POLICY "Allow authenticated update orders" ON orders
 
 CREATE POLICY "Allow authenticated read order_items" ON order_items
     FOR SELECT TO authenticated USING (true);
+
+CREATE POLICY "Allow authenticated read payments" ON payments
+    FOR SELECT TO authenticated USING (true);
+
 
 
