@@ -18,17 +18,22 @@ const prismaClientSingleton = () => {
     // On Vercel, the runtime workspace is read-only, so we copy dev.db to /tmp
     if (process.env.VERCEL) {
       const tempDbPath = '/tmp/dev.db';
-      if (!fs.existsSync(tempDbPath)) {
-        try {
+      try {
+        if (!fs.existsSync(tempDbPath)) {
           if (fs.existsSync(dbPath)) {
             fs.copyFileSync(dbPath, tempDbPath);
             console.log('Successfully copied dev.db to /tmp/dev.db');
           } else {
             console.warn('dev.db not found at', dbPath);
           }
-        } catch (e) {
-          console.error('Failed to copy dev.db to /tmp:', e);
         }
+        
+        // Ensure write permissions are explicitly set
+        if (fs.existsSync(tempDbPath)) {
+          fs.chmodSync(tempDbPath, 0o666);
+        }
+      } catch (e) {
+        console.error('Failed to copy/chmod dev.db to /tmp:', e);
       }
       dbPath = tempDbPath;
     }
