@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ShoppingBasket, Navigation, Menu, X, UserCircle, ShoppingBag } from "lucide-react";
+import { ShoppingBasket, Navigation, Menu, X, UserCircle, Truck } from "lucide-react";
 import { CartBadge } from "@/app/CartBadge";
 import { CartBadge as EcomCartBadge } from "@/components/CartBadge";
 
@@ -48,8 +48,8 @@ export function Navbar({ user }: NavbarProps) {
           </Link>
 
           <Link href="/cart" className="bg-green-700 hover:bg-green-650 text-white px-4 py-2 rounded-full flex items-center gap-2 transition border border-green-600">
-            <ShoppingBag size={16} />
-            Carrinho
+            <Truck size={16} />
+            Delivery
             <EcomCartBadge />
           </Link>
 
@@ -71,7 +71,7 @@ export function Navbar({ user }: NavbarProps) {
 
           <Link href="/cart" className="flex items-center relative" onClick={() => setIsOpen(false)}>
             <div className="bg-green-700 text-white p-2 rounded-full transition border border-green-600">
-              <ShoppingBag size={20} />
+              <Truck size={20} />
             </div>
             <div className="absolute -top-1 -right-2">
               <EcomCartBadge />
@@ -109,8 +109,8 @@ export function Navbar({ user }: NavbarProps) {
               Ver Minha Rota
             </Link>
             <Link href="/cart" className="p-4 bg-green-950 text-white rounded-2xl mt-2 flex items-center justify-center gap-2" onClick={() => setIsOpen(false)}>
-              <ShoppingBag size={20} /> 
-              Ver Carrinho
+              <Truck size={20} /> 
+              Ver Delivery
             </Link>
           </nav>
         </div>
