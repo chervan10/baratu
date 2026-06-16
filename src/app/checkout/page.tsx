@@ -14,7 +14,21 @@ import { ArrowLeft, ShoppingBag, CreditCard, ClipboardCheck, Lock, RefreshCw, Ch
 const checkoutFormSchema = z.object({
   customerName: z.string().min(2, "Nome completo é obrigatório (mínimo 2 caracteres)"),
   customerEmail: z.string().email("Endereço de e-mail inválido"),
-  customerPhone: z.string().regex(/^\+?[0-9\s-]{7,15}$/, "Número de telefone inválido (deve conter 7 a 15 algarismos)"),
+  customerPhone: z.string()
+    .refine((val) => {
+      const clean = val.replace(/[\s-]/g, "");
+      return /^(\+?258)?(84|85)\d{7}$/.test(clean);
+    }, {
+      message: "Apenas números M-Pesa da Vodacom (prefixo 84 ou 85) são permitidos."
+    })
+    .transform((val) => {
+      const clean = val.replace(/[\s-]/g, "");
+      const match = clean.match(/^(\+?258)?((84|85)\d{7})$/);
+      if (match) {
+        return `+258${match[2]}`;
+      }
+      return val;
+    }),
   country: z.string().min(2, "País é obrigatório"),
   provinceState: z.string().optional(),
   city: z.string().min(2, "Cidade é obrigatória"),
@@ -43,6 +57,7 @@ export default function CheckoutPage() {
     defaultValues: {
       country: "Moçambique",
       city: "Maputo",
+      customerPhone: "+258 ",
     },
   });
 

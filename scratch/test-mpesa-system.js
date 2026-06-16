@@ -79,6 +79,25 @@ async function runTests() {
     });
     assert(badPhoneRes.status === 400, "Validation block on invalid phone number format.");
 
+    // Test 1b: Invalid non-Vodacom Prefix Phone Number
+    const badPrefixRes = await fetch(`${BASE_URL}/api/checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customerName: "Chervan Tester",
+        customerEmail: `test-${Date.now()}@example.com`,
+        customerPhone: "863534259", // non-Vodacom prefix (Movitel)
+        country: "Moçambique",
+        city: "Maputo",
+        address: "Av. Mao Tse Tung",
+        postalCode: "1100",
+        cartItems: [
+          { productId: 1, productName: "Arroz Baratu", quantity: 2, unitPrice: 100, mercado: "Mercado Central" }
+        ]
+      })
+    });
+    assert(badPrefixRes.status === 400, "Validation block on non-Vodacom phone prefix.");
+
     // Test 2: Invalid negative amount subtotal
     const badAmountRes = await fetch(`${BASE_URL}/api/checkout`, {
       method: "POST",

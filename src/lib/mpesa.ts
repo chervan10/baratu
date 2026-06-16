@@ -79,14 +79,14 @@ export async function initiateMpesaPayment(
     };
   }
 
-  // Format phone number (should be standard Moz number format: +25884xxxxxxx or 84xxxxxxx)
+  // Format phone number (should be standard Moz number format: +25884xxxxxxx or +25885xxxxxxx)
   const cleanPhone = phoneNumber.replace(/[\s+-]/g, "");
-  if (!/^(258)?(84|85|82|83|86|87)\d{7}$/.test(cleanPhone)) {
+  if (!/^(258)?(84|85)\d{7}$/.test(cleanPhone)) {
     return {
       success: false,
       checkoutRequestId: "",
       responseCode: "400",
-      responseDescription: "Invalid M-Pesa phone number format.",
+      responseDescription: "Apenas números M-Pesa da Vodacom (prefixo 84 ou 85) são permitidos.",
     };
   }
 

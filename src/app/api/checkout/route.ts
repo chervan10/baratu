@@ -7,7 +7,21 @@ import { initiateMpesaPayment } from "@/lib/mpesa";
 const checkoutSchema = z.object({
   customerName: z.string().min(2, "Nome é obrigatório (mínimo 2 caracteres)"),
   customerEmail: z.string().email("Endereço de e-mail inválido"),
-  customerPhone: z.string().regex(/^\+?[0-9\s-]{7,15}$/, "Número de telefone inválido"),
+  customerPhone: z.string()
+    .refine((val) => {
+      const clean = val.replace(/[\s-]/g, "");
+      return /^(\+?258)?(84|85)\d{7}$/.test(clean);
+    }, {
+      message: "Apenas números M-Pesa da Vodacom (prefixo 84 ou 85) são permitidos."
+    })
+    .transform((val) => {
+      const clean = val.replace(/[\s-]/g, "");
+      const match = clean.match(/^(\+?258)?((84|85)\d{7})$/);
+      if (match) {
+        return `+258${match[2]}`;
+      }
+      return val;
+    }),
   country: z.string().min(2, "País é obrigatório"),
   provinceState: z.string().optional().nullable(),
   city: z.string().min(2, "Cidade é obrigatória"),
@@ -96,9 +110,9 @@ export async function POST(request: NextRequest) {
 
     // 4. M-Pesa Payment Request pre-validation
     const cleanPhone = customerPhone.replace(/[\s+-]/g, "");
-    if (!/^(258)?(84|85|82|83|86|87)\d{7}$/.test(cleanPhone)) {
+    if (!/^(258)?(84|85)\d{7}$/.test(cleanPhone)) {
       return NextResponse.json(
-        { error: "Formato de telefone M-Pesa inválido. Use um número de Moçambique válido (ex: 841234567)." },
+        { error: "Apenas números M-Pesa da Vodacom (prefixo 84 ou 85) são permitidos." },
         { status: 400 }
       );
     }
