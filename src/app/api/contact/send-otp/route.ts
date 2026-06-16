@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { Resend } from "resend";
 import bcrypt from "bcryptjs";
+import { cookies } from "next/headers";
+import { encrypt } from "@/lib/auth";
 
 // Initialize Resend with API Key from environment
 const resend = new Resend(process.env.RESEND_API_KEY || "re_mock_key");
@@ -19,16 +21,21 @@ export async function POST(req: NextRequest) {
 
     const emailNormalized = email.toLowerCase().trim();
 
-    // 1. Rate Limiting Check: Max 3 OTP requests per hour per email
+    // 1. Rate Limiting Check: Max 3 OTP requests per hour per email (100 during testing)
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    const otpCount = await prisma.emailOtp.count({
-      where: {
-        email: emailNormalized,
-        createdAt: {
-          gte: oneHourAgo,
+    let otpCount = 0;
+    try {
+      otpCount = await prisma.emailOtp.count({
+        where: {
+          email: emailNormalized,
+          createdAt: {
+            gte: oneHourAgo,
+          },
         },
-      },
-    });
+      });
+    } catch (dbErr) {
+      console.warn("Database failed to check OTP count for rate limiting, letting it proceed:", dbErr);
+    }
 
     const isTestingPeriod = new Date() < new Date("2026-08-31T00:00:00Z");
     const limit = isTestingPeriod ? 100 : 3;
@@ -48,14 +55,32 @@ export async function POST(req: NextRequest) {
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // Expires in 10 minutes
 
     // 4. Store the OTP in Supabase (SQLite/Postgres via Prisma)
-    await prisma.emailOtp.create({
-      data: {
-        email: emailNormalized,
-        otpCode: hashedOtp,
-        expiresAt,
-        verified: false,
-        attempts: 0,
-      },
+    try {
+      await prisma.emailOtp.create({
+        data: {
+          email: emailNormalized,
+          otpCode: hashedOtp,
+          expiresAt,
+          verified: false,
+          attempts: 0,
+        },
+      });
+    } catch (dbError) {
+      console.warn("Database failed to store OTP, falling back to stateful cookie:", dbError);
+    }
+
+    // 4b. Set stateless cookie with OTP state for serverless compatibility
+    const token = await encrypt({
+      email: emailNormalized,
+      hashedOtp,
+      expiresAt: Date.now() + 10 * 60 * 1000,
+    });
+    const cookieStore = await cookies();
+    cookieStore.set("contact_otp", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 10 * 60, // 10 minutes
     });
 
     // 5. Send OTP Email using Resend
