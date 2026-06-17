@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { Resend } from "resend";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { encrypt } from "@/lib/auth";
-
-// Initialize Resend with API Key from environment
-const resend = new Resend(process.env.RESEND_API_KEY || "re_mock_key");
 
 export async function POST(req: NextRequest) {
   try {
@@ -83,42 +79,49 @@ export async function POST(req: NextRequest) {
       maxAge: 10 * 60, // 10 minutes
     });
 
-    // 5. Send OTP Email using Resend
-    const fromEmail = "geral@baratu.co.mz";
-    const emailBody = `Olá,
-
-O seu código de verificação para o formulário de contacto da Baratu é:
-
-${otpCode}
-
-Este código expira em 10 minutos.
-
-Se não solicitou este código, por favor ignore este e-mail.`;
-
+    // 5. Send OTP Email using EmailJS REST API
     let emailSent = false;
-    let resendError = "";
-    if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== "re_mock_key") {
+    let emailJsError = "";
+
+    const serviceId = process.env.EMAILJS_SERVICE_ID;
+    const templateId = process.env.EMAILJS_TEMPLATE_ID;
+    const publicKey = process.env.EMAILJS_PUBLIC_KEY;
+    const privateKey = process.env.EMAILJS_PRIVATE_KEY; // Optional, required if enabled in EmailJS
+
+    if (serviceId && templateId && publicKey) {
       try {
-        const result = await resend.emails.send({
-          from: fromEmail,
-          to: emailNormalized,
-          subject: "Código de Verificação - Baratu",
-          text: emailBody,
+        const emailJsResponse = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            service_id: serviceId,
+            template_id: templateId,
+            user_id: publicKey,
+            accessToken: privateKey || undefined,
+            template_params: {
+              to_email: emailNormalized,
+              otp_code: otpCode,
+            },
+          }),
         });
-        if (result.error) {
-          console.error("Resend API error sending OTP email:", result.error);
-          resendError = JSON.stringify(result.error);
-        } else {
+
+        if (emailJsResponse.ok) {
           emailSent = true;
+        } else {
+          const text = await emailJsResponse.text();
+          console.error("EmailJS REST API error sending OTP email:", text);
+          emailJsError = text;
         }
       } catch (err: any) {
-        console.error("Resend API exception sending OTP email:", err);
-        resendError = err.message || "Unknown exception";
+        console.error("EmailJS exception sending OTP email:", err);
+        emailJsError = err.message || "Unknown exception";
       }
     }
 
     // Log to console so it's always accessible in serverless function logs / dev logs
-    console.log(`\n=========================================\n[OTP Verification] Code for ${emailNormalized} is: ${otpCode}\n(Sent from: ${fromEmail})\n=========================================\n`);
+    console.log(`\n=========================================\n[OTP Verification] Code for ${emailNormalized} is: ${otpCode}\n(Sent via EmailJS Service: ${serviceId || "SIMULATOR"})\n=========================================\n`);
 
     return NextResponse.json({
       success: true,
@@ -126,7 +129,7 @@ Se não solicitou este código, por favor ignore este e-mail.`;
         ? "Código de verificação enviado para o seu e-mail." 
         : "Código de verificação gerado em modo de simulação.",
       ...(isTestingPeriod ? { otp: otpCode } : {}),
-      resendError: resendError || undefined
+      emailJsError: emailJsError || undefined
     });
 
   } catch (error: any) {
