@@ -775,7 +775,7 @@ export default function CheckoutPage() {
                   <p className="font-bold text-green-950 mb-1 flex items-center justify-center gap-1">
                     <AlertCircle size={14} className="text-green-800" /> Modo de Simulação Ativo
                   </p>
-                  Como o endereço de envio <code className="bg-green-100/60 px-1 py-0.5 rounded text-green-950 font-semibold break-all">geral@baratu.co.mz</code> é fictício, utilize o código de teste gerado:
+                  As variáveis de ambiente do EmailJS não estão configuradas na Vercel, pelo que o e-mail não pôde ser enviado para <code className="bg-green-100/60 px-1 py-0.5 rounded text-green-950 font-semibold break-all">{getValues("customerEmail")}</code>. Para testar, utilize o código gerado:
                   <div className="text-lg font-black text-green-900 mt-1.5 tracking-wider font-mono bg-white border border-green-200/50 py-1 rounded-xl">
                     {mockOtp}
                   </div>
