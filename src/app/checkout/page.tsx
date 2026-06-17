@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import toast from "react-hot-toast";
 import Link from "next/link";
-import { ArrowLeft, ShoppingBag, CreditCard, ClipboardCheck, Lock, RefreshCw, CheckCircle2, X } from "lucide-react";
+import { ArrowLeft, ShoppingBag, CreditCard, ClipboardCheck, Lock, RefreshCw, CheckCircle2, X, Key, AlertCircle } from "lucide-react";
 
 // Form Validation Schema
 const checkoutFormSchema = z.object({
@@ -50,6 +50,17 @@ export default function CheckoutPage() {
   const [mpesaError, setMpesaError] = useState("");
   const [formData, setFormData] = useState<CheckoutFormValues | null>(null);
 
+  // Email verification states
+  const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [verifiedEmailValue, setVerifiedEmailValue] = useState("");
+  const [otpCodeInput, setOtpCodeInput] = useState("");
+  const [otpError, setOtpError] = useState("");
+  const [resendCountdown, setResendCountdown] = useState(0);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [mockOtp, setMockOtp] = useState("");
+
   const {
     register,
     handleSubmit,
@@ -86,12 +97,124 @@ export default function CheckoutPage() {
     }
   }, [cart, router, submitting]);
 
-  const handleNextStep = () => {
-    // If form is valid, trigger step change
-    setStep("review");
+  // Countdown timer for OTP Resend
+  useEffect(() => {
+    if (resendCountdown > 0) {
+      const timer = setTimeout(() => setResendCountdown(resendCountdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendCountdown]);
+
+  // Request OTP via backend
+  const handleRequestOtp = async () => {
+    const email = getValues("customerEmail");
+    if (!email) {
+      toast.error("Por favor, introduza um e-mail válido.");
+      return;
+    }
+    setSendingOtp(true);
+    setOtpError("");
+    
+    try {
+      const response = await fetch("/api/contact/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        toast.success(data.message || "Código enviado com sucesso!");
+        if (data.otp) {
+          setMockOtp(data.otp);
+          toast(`[TESTE] Código OTP de verificação: ${data.otp}`, {
+            icon: "🔑",
+            duration: 10000,
+          });
+        } else {
+          setMockOtp("");
+        }
+        setIsVerifyingEmail(true);
+        setResendCountdown(60);
+      } else {
+        const errorMsg = data.details 
+          ? `${data.error || "Erro"}: ${data.details}` 
+          : (data.error || "Erro ao solicitar código de verificação.");
+        toast.error(errorMsg);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro de ligação. Por favor, tente novamente.");
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  // Verify OTP Code
+  const handleConfirmOtp = async () => {
+    const email = getValues("customerEmail");
+    
+    if (otpCodeInput.length !== 6 || !/^\d+$/.test(otpCodeInput)) {
+      setOtpError("O código deve conter exatamente 6 algarismos numéricos.");
+      return;
+    }
+
+    setVerifyingOtp(true);
+    setOtpError("");
+
+    try {
+      const response = await fetch("/api/contact/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, otp: otpCodeInput }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success("E-mail verificado com sucesso!");
+        setEmailVerified(true);
+        setVerifiedEmailValue(email);
+        setIsVerifyingEmail(false);
+        setOtpCodeInput("");
+        
+        // Immediately advance to next step after verification!
+        setStep("review");
+      } else {
+        const errorMsg = data.details 
+          ? `${data.error || "Erro"}: ${data.details}` 
+          : (data.error || "Código incorreto. Tente novamente.");
+        setOtpError(errorMsg);
+      }
+    } catch (err) {
+      console.error(err);
+      setOtpError("Erro na ligação ao servidor.");
+    } finally {
+      setVerifyingOtp(false);
+    }
+  };
+
+  const handleNextStep = (data: CheckoutFormValues) => {
+    const email = data.customerEmail;
+    
+    // Check if the email was already verified and matches the current form value
+    if (emailVerified && email.toLowerCase().trim() === verifiedEmailValue.toLowerCase().trim()) {
+      setStep("review");
+      return;
+    }
+
+    // Otherwise, trigger the OTP verification modal flow
+    handleRequestOtp();
   };
 
   const onFormSubmit = (data: CheckoutFormValues) => {
+    if (!emailVerified || data.customerEmail.toLowerCase().trim() !== verifiedEmailValue.toLowerCase().trim()) {
+      toast.error("Por favor, verifique o seu endereço de e-mail antes de rever a encomenda.");
+      setStep("billing");
+      return;
+    }
+
     if (!termsAccepted) {
       toast.error("Por favor, confirme a encomenda assinalando a caixa de verificação.");
       return;
@@ -228,15 +351,41 @@ export default function CheckoutPage() {
 
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Endereço de E-mail</label>
-                  <input
-                    type="email"
-                    {...register("customerEmail")}
-                    className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl text-sm outline-none transition-all ${
-                      errors.customerEmail ? "border-red-500 focus:ring-2 focus:ring-red-100" : "border-gray-200 focus:ring-2 focus:ring-green-100 focus:border-green-800"
-                    }`}
-                    placeholder="Ex: chervan@example.com"
-                  />
+                  <div className="relative">
+                    <input
+                      type="email"
+                      disabled={emailVerified}
+                      {...register("customerEmail")}
+                      className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl text-sm outline-none transition-all ${
+                        emailVerified ? "border-green-200 bg-green-50/30 text-green-950 font-medium" : ""
+                      } ${
+                        errors.customerEmail ? "border-red-500 focus:ring-2 focus:ring-red-100" : "border-gray-200 focus:ring-2 focus:ring-green-100 focus:border-green-800"
+                      }`}
+                      placeholder="Ex: chervan@example.com"
+                    />
+                    {emailVerified && (
+                      <CheckCircle2 size={16} className="absolute right-3.5 top-3 text-green-600" />
+                    )}
+                  </div>
                   {errors.customerEmail && <p className="text-xs text-red-500 mt-1.5 font-semibold">{errors.customerEmail.message}</p>}
+                  {emailVerified && (
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-green-700 text-xs font-bold flex items-center gap-1">
+                        <CheckCircle2 size={12} /> E-mail verificado!
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEmailVerified(false);
+                          setVerifiedEmailValue("");
+                          setValue("customerEmail", "");
+                        }}
+                        className="text-red-500 hover:text-red-700 text-[10px] font-bold cursor-pointer hover:underline"
+                      >
+                        Alterar E-mail
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -583,6 +732,111 @@ export default function CheckoutPage() {
               >
                 Cancelar
               </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* OTP Verification Modal Overlay */}
+      {isVerifyingEmail && (
+        <div
+          className="fixed inset-0 bg-stone-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4 transition-all duration-300 animate-in fade-in"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-title"
+        >
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-gray-100 relative overflow-hidden animate-in zoom-in-95 duration-300">
+            
+            <button 
+              type="button"
+              onClick={() => setIsVerifyingEmail(false)}
+              className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 transition-colors p-1.5 hover:bg-gray-50 rounded-full cursor-pointer"
+              aria-label="Fechar"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex flex-col items-center text-center">
+              <div className="bg-yellow-100/80 text-yellow-800 w-16 h-16 rounded-full flex items-center justify-center mb-6 border border-yellow-200 shadow-sm animate-bounce">
+                <Key size={32} />
+              </div>
+
+              <h3 id="modal-title" className="text-2xl font-black text-gray-900 mb-2">
+                Verifique o seu E-mail
+              </h3>
+
+              <p className="text-gray-500 text-xs mt-2 leading-relaxed mb-6">
+                Enviámos um código de 6 algarismos para <strong className="text-gray-800 break-all">{getValues("customerEmail")}</strong>. Insira-o abaixo para continuar.
+              </p>
+
+              {mockOtp && (
+                <div className="w-full mb-6 p-4 bg-green-50/80 border border-green-200 rounded-2xl text-green-950 text-xs text-center font-medium leading-relaxed shadow-sm">
+                  <p className="font-bold text-green-950 mb-1 flex items-center justify-center gap-1">
+                    <AlertCircle size={14} className="text-green-800" /> Modo de Simulação Ativo
+                  </p>
+                  Como o endereço de envio <code className="bg-green-100/60 px-1 py-0.5 rounded text-green-950 font-semibold break-all">geral@baratu.co.mz</code> é fictício, utilize o código de teste gerado:
+                  <div className="text-lg font-black text-green-900 mt-1.5 tracking-wider font-mono bg-white border border-green-200/50 py-1 rounded-xl">
+                    {mockOtp}
+                  </div>
+                </div>
+              )}
+
+              {/* OTP Code Input */}
+              <div className="w-full mb-6">
+                <input
+                  type="text"
+                  maxLength={6}
+                  placeholder="123456"
+                  value={otpCodeInput}
+                  onChange={(e) => setOtpCodeInput(e.target.value.replace(/\D/g, ""))}
+                  className="w-full text-center px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-2xl font-mono tracking-[0.75em] focus:outline-none focus:ring-2 focus:ring-green-200 focus:border-green-800"
+                  aria-label="Código de verificação OTP de 6 dígitos"
+                />
+
+                {otpError && (
+                  <p className="text-red-500 text-xs font-bold mt-2 flex items-center justify-center gap-1">
+                    <AlertCircle size={12} /> {otpError}
+                  </p>
+                )}
+              </div>
+
+              {/* Control Buttons */}
+              <div className="w-full space-y-3">
+                <button
+                  type="button"
+                  disabled={verifyingOtp}
+                  onClick={handleConfirmOtp}
+                  className="w-full py-3.5 bg-green-800 hover:bg-green-700 text-white font-extrabold text-sm rounded-2xl shadow-sm transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:bg-gray-300 disabled:text-gray-500"
+                >
+                  {verifyingOtp ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" /> Verificando...
+                    </>
+                  ) : (
+                    "Confirmar Código"
+                  )}
+                </button>
+
+                <div className="flex items-center justify-between text-xs w-full pt-2">
+                  <span className="text-gray-400">Não recebeu o código?</span>
+
+                  {resendCountdown > 0 ? (
+                    <span className="text-gray-500 font-semibold">
+                      Reenviar em {resendCountdown}s
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleRequestOtp}
+                      className="text-green-800 hover:text-green-700 font-extrabold cursor-pointer hover:underline"
+                    >
+                      Reenviar Código
+                    </button>
+                  )}
+                </div>
+              </div>
+
             </div>
 
           </div>
