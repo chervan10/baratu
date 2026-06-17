@@ -88,6 +88,8 @@ export async function POST(req: NextRequest) {
     const publicKey = process.env.EMAILJS_PUBLIC_KEY;
     const privateKey = process.env.EMAILJS_PRIVATE_KEY; // Optional, required if enabled in EmailJS
 
+    console.log(`[EmailJS Debug] Keys present -> Service: ${!!serviceId}, Template: ${!!templateId}, Public: ${!!publicKey}, Private: ${!!privateKey}`);
+
     if (serviceId && templateId && publicKey) {
       try {
         const emailJsResponse = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
