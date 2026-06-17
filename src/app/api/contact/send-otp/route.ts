@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
       message: emailSent 
         ? "Código de verificação enviado para o seu e-mail." 
         : "Código de verificação gerado em modo de simulação.",
-      ...(isTestingPeriod ? { otp: otpCode } : {}),
+      ...((isTestingPeriod && !emailSent) ? { otp: otpCode } : {}),
       emailJsError: emailJsError || undefined
     });
 

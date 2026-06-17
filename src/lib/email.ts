@@ -1,15 +1,5 @@
-import { Resend } from "resend";
-
-const resendApiKey = process.env.RESEND_API_KEY;
 const emailFrom = process.env.EMAIL_FROM || "onboarding@resend.dev";
-const storeOwnerEmail = process.env.STORE_OWNER_EMAIL || "admin@gmail.com"; // store owner email
-
-let resend: Resend | null = null;
-if (resendApiKey) {
-  resend = new Resend(resendApiKey);
-} else {
-  console.warn("WARNING: RESEND_API_KEY is not set. Emails will log directly to the terminal console.");
-}
+const storeOwnerEmail = process.env.STORE_OWNER_EMAIL || "chervan.cachaco@gmail.com"; // default store owner email
 
 interface OrderEmailData {
   orderNumber: string;
@@ -335,49 +325,78 @@ export async function sendOrderEmails(order: OrderEmailData, items: OrderItemEma
   const ownerSubject = `Nova Encomenda Recebida #${order.orderNumber} - Baratu (${order.customerName})`;
   const ownerHtml = buildOwnerEmailHtml(order, items);
 
+  const serviceId = process.env.EMAILJS_SERVICE_ID;
+  const templateId = process.env.EMAILJS_TEMPLATE_ID_RECEIPT || process.env.EMAILJS_TEMPLATE_ID;
+  const publicKey = process.env.EMAILJS_PUBLIC_KEY;
+  const privateKey = process.env.EMAILJS_PRIVATE_KEY;
+
+  if (serviceId && templateId && publicKey) {
+    try {
+      // 1. Send customer email
+      const customerResponse = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          service_id: serviceId,
+          template_id: templateId,
+          user_id: publicKey,
+          accessToken: privateKey || undefined,
+          template_params: {
+            to_email: order.customerEmail,
+            subject: customerSubject,
+            body_html: customerHtml,
+          },
+        }),
+      });
+
+      if (!customerResponse.ok) {
+        const text = await customerResponse.text();
+        console.error("EmailJS REST API error sending receipt to customer:", text);
+      }
+
+      // 2. Send owner email
+      const ownerResponse = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          service_id: serviceId,
+          template_id: templateId,
+          user_id: publicKey,
+          accessToken: privateKey || undefined,
+          template_params: {
+            to_email: storeOwnerEmail,
+            subject: ownerSubject,
+            body_html: ownerHtml,
+          },
+        }),
+      });
+
+      if (!ownerResponse.ok) {
+        const text = await ownerResponse.text();
+        console.error("EmailJS REST API error sending receipt to store owner:", text);
+      }
+
+      return customerResponse.ok && ownerResponse.ok;
+    } catch (err) {
+      console.error("Exception in sendOrderEmails dispatching via EmailJS:", err);
+      return false;
+    }
+  }
+
   // Fallback if not configured
-  if (!resend) {
-    console.log("==========================================");
-    console.log(`[EMAIL SIMULATOR - TO CUSTOMER: ${order.customerEmail}]`);
-    console.log(`Subject: ${customerSubject}`);
-    console.log(`From: ${emailFrom}`);
-    console.log("HTML Body Preview length:", customerHtml.length);
-    console.log("------------------------------------------");
-    console.log(`[EMAIL SIMULATOR - TO OWNER: ${storeOwnerEmail}]`);
-    console.log(`Subject: ${ownerSubject}`);
-    console.log("HTML Body Preview length:", ownerHtml.length);
-    console.log("==========================================");
-    return true;
-  }
-
-  try {
-    // 1. Send customer email
-    const customerResult = await resend.emails.send({
-      from: emailFrom,
-      to: order.customerEmail,
-      subject: customerSubject,
-      html: customerHtml,
-    });
-
-    if (customerResult.error) {
-      console.error("Error sending order confirmation to customer via Resend:", customerResult.error);
-    }
-
-    // 2. Send owner email
-    const ownerResult = await resend.emails.send({
-      from: emailFrom,
-      to: storeOwnerEmail,
-      subject: ownerSubject,
-      html: ownerHtml,
-    });
-
-    if (ownerResult.error) {
-      console.error("Error sending notification to store owner via Resend:", ownerResult.error);
-    }
-
-    return !customerResult.error && !ownerResult.error;
-  } catch (err) {
-    console.error("Exception in sendOrderEmails dispatching:", err);
-    return false;
-  }
+  console.log("==========================================");
+  console.log(`[EMAIL SIMULATOR - TO CUSTOMER: ${order.customerEmail}]`);
+  console.log(`Subject: ${customerSubject}`);
+  console.log(`From: ${emailFrom}`);
+  console.log("HTML Body Preview length:", customerHtml.length);
+  console.log("------------------------------------------");
+  console.log(`[EMAIL SIMULATOR - TO OWNER: ${storeOwnerEmail}]`);
+  console.log(`Subject: ${ownerSubject}`);
+  console.log("HTML Body Preview length:", ownerHtml.length);
+  console.log("==========================================");
+  return true;
 }
