@@ -348,6 +348,7 @@ export async function sendOrderEmails(order: OrderEmailData, items: OrderItemEma
           template_id: templateId,
           user_id: publicKey,
           accessToken: privateKey || undefined,
+          access_token: privateKey || undefined,
           template_params: {
             to_email: order.customerEmail,
             subject: customerSubject,
@@ -372,6 +373,7 @@ export async function sendOrderEmails(order: OrderEmailData, items: OrderItemEma
           template_id: templateId,
           user_id: publicKey,
           accessToken: privateKey || undefined,
+          access_token: privateKey || undefined,
           template_params: {
             to_email: storeOwnerEmail,
             subject: ownerSubject,

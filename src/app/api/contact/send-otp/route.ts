@@ -110,6 +110,7 @@ export async function POST(req: NextRequest) {
             template_id: templateId,
             user_id: publicKey,
             accessToken: privateKey || undefined,
+            access_token: privateKey || undefined, // fallback for different casings
             template_params: {
               to_email: emailNormalized,
               otp_code: otpCode,
