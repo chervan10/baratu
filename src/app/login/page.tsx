@@ -41,15 +41,15 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <form className="space-y-6" action={loginUser}>
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                E-mail
+                E-mail ou Nome de utilizador
               </label>
               <div className="mt-1">
                 <input
                   name="email"
-                  type="email"
-                  autoComplete="email"
+                  type="text"
                   required
-                  className="appearance-none block w-full px-3 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-800 focus:border-green-800 sm:text-sm"
+                  className="appearance-none block w-full px-3 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-800 focus:border-green-800 sm:text-sm text-gray-900"
+                  placeholder="exemplo@gmail.com ou joao_silva"
                 />
               </div>
             </div>

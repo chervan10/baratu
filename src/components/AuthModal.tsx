@@ -128,15 +128,14 @@ export function AuthModal() {
 
             <div>
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                E-mail
+                E-mail ou Nome de utilizador
               </label>
               <div className="relative">
                 <Mail className="absolute left-3.5 top-3.5 text-gray-400" size={18} />
                 <input
                   name="email"
-                  type="email"
-                  placeholder="exemplo@gmail.com"
-                  autoComplete="email"
+                  type="text"
+                  placeholder="exemplo@gmail.com ou joao_silva"
                   required
                   className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-green-100 focus:border-green-800 transition-all placeholder:text-gray-400 text-gray-900"
                 />

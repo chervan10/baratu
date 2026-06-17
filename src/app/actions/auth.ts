@@ -90,13 +90,13 @@ export async function loginUser(formData: FormData) {
     redirect("/login?error=Todos os campos são obrigatórios.");
   }
 
-  const emailNormalized = email.toLowerCase().trim();
+  const valNormalized = email.toLowerCase().trim();
 
   // Check if this is the admin login!
-  if (emailNormalized === "admin@gmail.com") {
+  if (valNormalized === "admin@gmail.com") {
     if (password === "th@nkmelater") {
       try {
-        const adminSessionToken = await encrypt({ role: "admin", email: emailNormalized });
+        const adminSessionToken = await encrypt({ role: "admin", email: valNormalized });
         (await cookies()).set("admin_session", adminSessionToken, {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
@@ -116,8 +116,13 @@ export async function loginUser(formData: FormData) {
 
   let user;
   try {
-    user = await prisma.user.findUnique({
-      where: { email: emailNormalized },
+    user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: valNormalized },
+          { username: valNormalized }
+        ]
+      },
     });
   } catch (dbError) {
     console.error("Database error during login:", dbError);
