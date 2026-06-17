@@ -325,10 +325,15 @@ export async function sendOrderEmails(order: OrderEmailData, items: OrderItemEma
   const ownerSubject = `Nova Encomenda Recebida #${order.orderNumber} - Baratu (${order.customerName})`;
   const ownerHtml = buildOwnerEmailHtml(order, items);
 
-  const serviceId = process.env.EMAILJS_SERVICE_ID;
-  const templateId = process.env.EMAILJS_TEMPLATE_ID_RECEIPT || process.env.EMAILJS_TEMPLATE_ID;
-  const publicKey = process.env.EMAILJS_PUBLIC_KEY;
-  const privateKey = process.env.EMAILJS_PRIVATE_KEY;
+  const cleanEnvKey = (key: string | undefined) => {
+    if (!key) return undefined;
+    return key.replace(/^['"]|['"]$/g, "").trim();
+  };
+
+  const serviceId = cleanEnvKey(process.env.EMAILJS_SERVICE_ID);
+  const templateId = cleanEnvKey(process.env.EMAILJS_TEMPLATE_ID_RECEIPT || process.env.EMAILJS_TEMPLATE_ID);
+  const publicKey = cleanEnvKey(process.env.EMAILJS_PUBLIC_KEY);
+  const privateKey = cleanEnvKey(process.env.EMAILJS_PRIVATE_KEY);
 
   if (serviceId && templateId && publicKey) {
     try {

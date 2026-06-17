@@ -83,12 +83,20 @@ export async function POST(req: NextRequest) {
     let emailSent = false;
     let emailJsError = "";
 
-    const serviceId = process.env.EMAILJS_SERVICE_ID;
-    const templateId = process.env.EMAILJS_TEMPLATE_ID;
-    const publicKey = process.env.EMAILJS_PUBLIC_KEY;
-    const privateKey = process.env.EMAILJS_PRIVATE_KEY; // Optional, required if enabled in EmailJS
+    const cleanEnvKey = (key: string | undefined) => {
+      if (!key) return undefined;
+      return key.replace(/^['"]|['"]$/g, "").trim();
+    };
+
+    const serviceId = cleanEnvKey(process.env.EMAILJS_SERVICE_ID);
+    const templateId = cleanEnvKey(process.env.EMAILJS_TEMPLATE_ID);
+    const publicKey = cleanEnvKey(process.env.EMAILJS_PUBLIC_KEY);
+    const privateKey = cleanEnvKey(process.env.EMAILJS_PRIVATE_KEY); // Optional, required if enabled in EmailJS
 
     console.log(`[EmailJS Debug] Keys present -> Service: ${!!serviceId}, Template: ${!!templateId}, Public: ${!!publicKey}, Private: ${!!privateKey}`);
+    if (privateKey) {
+      console.log(`[EmailJS Debug] Private key details -> Length: ${privateKey.length}, Starts with: ${privateKey.substring(0, 3)}...`);
+    }
 
     if (serviceId && templateId && publicKey) {
       try {
